@@ -1,0 +1,6 @@
+pymupdf
+ebooklib
+beautifulsoup4
+pytesseract
+pillow
+rich
