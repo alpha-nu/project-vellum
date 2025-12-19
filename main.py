@@ -21,7 +21,11 @@ def main():
         return
 
     # Batch logic
-    files = [f for f in input_path.iterdir() if f.suffix.lower() in [".pdf", ".epub"]] if input_path.is_dir() else [input_path]
+    if input_path.is_dir():
+        all_compatible_files = [f for f in input_path.iterdir() if f.suffix.lower() in [".pdf", ".epub"]]
+        files = ui.select_files(all_compatible_files)
+    else:
+        files = [input_path]
     
     if not files:
         ui.console.print("[yellow]NO COMPATIBLE FILES FOUND.[/yellow]")
