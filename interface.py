@@ -2,7 +2,9 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
 from rich.prompt import Prompt, IntPrompt, Confirm
-from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.progress import Progress, TextColumn, BarColumn, TimeRemainingColumn, TimeElapsedColumn
+from rich.live import Live
+from contextlib import contextmanager
 from rich.table import Table
 from rich.align import Align
 import readchar
@@ -19,22 +21,20 @@ class RetroCLI:
         term_width = self.console.size.width
         self.console.print(Align.center(renderable, width=term_width))
 
-    def input_center(self, prompt_symbol='>>'):
-        """Show a centered prompt symbol and read input with the cursor visually centered.
+    def input_center(self, prompt_symbol='>>: '):
+        """Show a left-justified prompt within the centered max-width layout.
 
-        This prints a prompt consisting of the prompt_symbol centered inside the
-        configured panel width and uses Console.input so the cursor appears after
-        the centered symbol.
+        The prompt_symbol appears at the left edge of the max-width panel,
+        which is itself centered on the terminal.
         """
         term_width = self.console.size.width
         panel_width = min(self.max_width, term_width)
 
-        # create a plain centered prompt inside the panel width, then add left padding
-        plain_center = prompt_symbol.center(panel_width)
+        # Left-justify the prompt with left padding to align with the centered panel
         left_padding = (term_width - panel_width) // 2
-        prompt_str = " " * left_padding + plain_center
+        prompt_str = " " * left_padding + prompt_symbol
 
-        # Render with markup for color, but center computed on plain text
+        # Render with markup for color
         markup = f"[bold grey74]{prompt_str}[/bold grey74]"
         return self.console.input(markup, markup=True)
 
@@ -72,8 +72,8 @@ class RetroCLI:
         current_index = 0
         
         while True:
-            # self.console.clear()
-            # self.draw_header()
+            self.console.clear()
+            self.draw_header()
             
             # Build table with highlighted current selection
             table = Table(
@@ -134,7 +134,7 @@ class RetroCLI:
             width=min(self.max_width, self.console.size.width)
         )
         self.print_center(path_prompt)
-        path_str = self.input_center('>>')
+        path_str = self.input_center()
         
         # Format selection prompt
         format_prompt = Panel(
@@ -145,7 +145,7 @@ class RetroCLI:
         self.print_center(format_prompt)
         # simple validation loop for numeric choice
         while True:
-            resp = self.input_center('1/2/3')
+            resp = self.input_center()
             if resp and resp.strip() in ("1", "2", "3"):
                 format_choice = int(resp.strip())
                 break
@@ -160,7 +160,7 @@ class RetroCLI:
         self.print_center(merge_prompt)
         # yes/no prompt
         while True:
-            resp = self.input_center('y/N')
+            resp = self.input_center()
             if not resp:
                 merge_choice = False
                 break
@@ -176,8 +176,26 @@ class RetroCLI:
         return path_str, format_choice, merge_choice
 
     def get_progress_bar(self):
-        return Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            transient=True
-        )
+        # Return a context manager that renders the Progress inside a centered Panel
+        @contextmanager
+        def _progress_ctx():
+            progress = Progress(
+                TextColumn("[progress.description]{task.description}"),
+                BarColumn(bar_width=None),
+                TextColumn("{task.percentage:>3.0f}%"),
+                TimeElapsedColumn(),
+                TimeRemainingColumn(),
+                console=self.console,
+                transient=True,
+            )
+
+            panel = Panel(progress, border_style=self.colors["accent"], width=min(self.max_width, self.console.size.width))
+            term_width = self.console.size.width
+            centered = Align.center(panel, width=term_width)
+            with Live(centered, console=self.console, refresh_per_second=10):
+                try:
+                    yield progress
+                finally:
+                    pass
+
+        return _progress_ctx()

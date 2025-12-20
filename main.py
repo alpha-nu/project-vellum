@@ -5,6 +5,7 @@ from converters import PDFConverter, EPubConverter
 from outputs import PlainTextHandler, MarkdownHandler, JSONHandler
 from rich.panel import Panel
 from rich.align import Align
+import time
 
 def get_converter(file_path: Path):
     ext_map = {".pdf": PDFConverter, ".epub": EPubConverter}
@@ -46,11 +47,14 @@ def main():
     handler = {1: PlainTextHandler(), 2: MarkdownHandler(), 3: JSONHandler()}[format_choice]
     accumulator = []
 
+    start_time = time.perf_counter()
     with ui.get_progress_bar() as progress:
-        task = progress.add_task("[green]Processing...", total=len(files))
-        
+        # create a progress bar task per file (0-100). We'll mark each file 100 when done.
+        tasks = {file: progress.add_task(f"{file.name}", total=100) for file in files}
+
         for file in files:
-            progress.update(task, description=f"[white]Converting {file.name}...[/white]")
+            task_id = tasks[file]
+            progress.update(task_id, description=f"[white]Converting {file.name}...[/white]", completed=0)
             converter = get_converter(file)
             if converter:
                 content = converter.extract_content()
@@ -58,8 +62,8 @@ def main():
                     accumulator.append(f"\n--- START SOURCE: {file.name} ---\n{content}")
                 else:
                     handler.save(content, file)
-                ui.console.print(f"  [green]✔[/green] {file.name}")
-            progress.advance(task)
+                # mark file as completed
+                progress.update(task_id, completed=100, description=f"[green]Done {file.name}[/green]")
 
     if merge_enabled and accumulator:
         output_name = input_path / "VELLUM_MERGED_OUTPUT" if input_path.is_dir() else input_path.with_name(f"{input_path.stem}_merged")
@@ -71,8 +75,9 @@ def main():
         ))
         ui.console.print(merge_complete_panel)
 
+    elapsed = time.perf_counter() - start_time
     shutdown_panel = Align.center(Panel(
-        "[bold plum3]SHUTDOWN COMPLETE[/bold plum3]",
+        f"[bold plum3]CONVERSION COMPLETE[/bold plum3]\n[grey74]Run time: {elapsed:.2f}s[/grey74]",
         border_style="grey74",
         width=min(ui.max_width, ui.console.size.width)
     ))
