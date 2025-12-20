@@ -4,27 +4,52 @@ from rich.text import Text
 from rich.prompt import Prompt, IntPrompt, Confirm
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
-import os
+from rich.align import Align
+import readchar
 from pathlib import Path
 
 class RetroCLI:
     def __init__(self):
+        self.max_width = 120  # 60% of typical terminal (200 chars)
         self.console = Console()
-        self.colors = {"fg": "lavender", "accent": "medium_purple4"}
+        self.colors = {"fg": "plum3", "accent": "grey74"}
+
+    def print_center(self, renderable):
+        """Print a renderable centered within the configured console width."""
+        term_width = self.console.size.width
+        self.console.print(Align.center(renderable, width=term_width))
+
+    def input_center(self, prompt_symbol='>>'):
+        """Show a centered prompt symbol and read input with the cursor visually centered.
+
+        This prints a prompt consisting of the prompt_symbol centered inside the
+        configured panel width and uses Console.input so the cursor appears after
+        the centered symbol.
+        """
+        term_width = self.console.size.width
+        panel_width = min(self.max_width, term_width)
+
+        # create a plain centered prompt inside the panel width, then add left padding
+        plain_center = prompt_symbol.center(panel_width)
+        left_padding = (term_width - panel_width) // 2
+        prompt_str = " " * left_padding + plain_center
+
+        # Render with markup for color, but center computed on plain text
+        markup = f"[bold grey74]{prompt_str}[/bold grey74]"
+        return self.console.input(markup, markup=True)
+
 
     def draw_header(self):
-        self.VERSION = "1.0.0"
+        self.VERSION = "[ epub | pdf -> txt: CONVERTER ] v.1.0.0"
         ascii_logo = """
-        ██╗   ██╗███████╗██╗     ██╗     ██╗   ██╗███╗   ███╗
-        ██║   ██║██╔════╝██║     ██║     ██║   ██║████╗ ████║
-        ██║   ██║█████╗  ██║     ██║     ██║   ██║██╔████╔██║
-        ╚██╗ ██╔╝██╔══╝  ██║     ██║     ██║   ██║██║╚██╔╝██║
-         ╚████╔╝ ███████╗███████╗███████╗╚██████╔╝██║ ╚═╝ ██║
-          ╚═══╝  ╚══════╝╚══════╝╚══════╝ ╚═════╝ ╚═╝     ╚═╝
-        [ epub | pdf -> txt: CONVERTER ]
+    ██╗   ██╗███████╗██╗     ██╗     ██╗   ██╗███╗   ███╗
+    ██║   ██║██╔════╝██║     ██║     ██║   ██║████╗ ████║
+    ██║   ██║█████╗  ██║     ██║     ██║   ██║██╔████╔██║
+    ╚██╗ ██╔╝██╔══╝  ██║     ██║     ██║   ██║██║╚██╔╝██║
+     ╚████╔╝ ███████╗███████╗███████╗╚██████╔╝██║ ╚═╝ ██║
+      ╚═══╝  ╚══════╝╚══════╝╚══════╝ ╚═════╝ ╚═╝     ╚═╝
         """
-
-        subtitle = f"[ {self.VERSION} ]"
+        subtitle = f"{self.VERSION}"
         
         # Calculate padding to center the subtitle
         # Assuming ascii_logo's widest line is around 60-70 chars for centering purposes
@@ -32,68 +57,121 @@ class RetroCLI:
         subtitle_width = len(subtitle) - 1 # account for rich's markup
         padding = (logo_width - subtitle_width) // 2
         
-        self.console.print(
-            Panel(
-                Text(ascii_logo, style=self.colors["fg"])
-                + Text("\n" + " " * padding + subtitle, style=f"bold {self.colors['accent']}"),
+        self.print_center(
+                Panel(
+                Align.center(Text(ascii_logo, style=self.colors["fg"]) + Text("\n" + " " * padding + subtitle, style=f"bold {self.colors['accent']}")),
                 border_style=self.colors["accent"],
-                width=self.console.width # Fill the entire screen width
+                width=min(self.max_width, self.console.size.width),
             )
         )
 
     def select_files(self, files: list[Path]) -> list[Path]:
+        """File selection using arrow keys and Enter. Header stays visible."""
         
         selected_files = []
+        current_index = 0
         
         while True:
+            # self.console.clear()
+            # self.draw_header()
+            
+            # Build table with highlighted current selection
             table = Table(
-                title="[bold yellow]SELECT FILES FOR CONVERSION[/bold yellow]",
-                row_styles=["none", "dim"],
-                show_header=True,
-                header_style="bold magenta",
-                width=self.console.width
+                title="[bold plum3]SELECT FILES FOR CONVERSION[/bold plum3]",
+                show_header=False,
+                    width=min(self.max_width, self.console.size.width),
+                border_style=self.colors["accent"]
             )
-            table.add_column(" ", style="dim", width=3)
-            table.add_column("Filename", style="green")
+            table.add_column("File", style="grey74")
             
             for i, file in enumerate(files):
-                checkbox = "[green]\[x][/green]" if file in selected_files else "[red]\[ ][/red]"
-                table.add_row(str(i + 1), f"{checkbox} {file.name}")
+                checkbox = "[plum3]✓[/plum3]" if file in selected_files else "[plum3]◯[/plum3]"
+                style = "bold plum3" if i == current_index else ""
+                marker = "→" if i == current_index else " "
+                filename_text = f"[{style}]{file.name}[/{style}]" if style else file.name
+                table.add_row(
+                    f"{marker} {checkbox} {filename_text}"
+                )
             
-            self.console.print(table)
-            self.console.print("\\n[bold cyan]Select file numbers (e.g., 1 3 5), \'a\' to select all, or \'d\' to finish:[/bold cyan]")
+            # Center the table
+            self.print_center(Panel(table, border_style=self.colors["accent"], width=min(self.max_width, self.console.size.width)))
+            self.print_center(Panel("[bold plum3]↑/↓ Navigate  SPACE Toggle  ENTER Confirm[/bold plum3]", border_style=self.colors["accent"], width=min(self.max_width, self.console.size.width)))
             
-            choice = Prompt.ask("[bold green]>>[/bold green]").lower()
+            key = readchar.readchar()
             
-            if choice == 'd':
+            if key == '\x1b':  # Escape sequence
+                next1 = readchar.readchar()
+                next2 = readchar.readchar()
+                if next1 == '[':
+                    if next2 == 'A':  # Up arrow
+                        current_index = (current_index - 1) % len(files)
+                    elif next2 == 'B':  # Down arrow
+                        current_index = (current_index + 1) % len(files)
+            elif key == ' ':  # Space to toggle
+                file = files[current_index]
+                if file in selected_files:
+                    selected_files.remove(file)
+                else:
+                    selected_files.append(file)
+            elif key in ('\r', '\n'):  # Enter to confirm
                 break
-            elif choice == 'a':
+            elif key.lower() == 'a':  # 'a' to select all
                 selected_files = list(files)
-            else:
-                try:
-                    indices = [int(x) - 1 for x in choice.split()]
-                    for i in indices:
-                        if 0 <= i < len(files):
-                            file = files[i]
-                            if file in selected_files:
-                                selected_files.remove(file)
-                            else:
-                                selected_files.append(file)
-                except ValueError:
-                    self.console.print("[red]Invalid input. Please enter numbers, \'a\', or \'d\'.[/red]")
-            self.console.clear()
-            self.draw_header()
+                break
+            elif key.lower() == 'q':  # 'q' to quit/go back
+                break
         
         return selected_files
 
     def get_user_input(self):
-        self.console.print("\\n[bold cyan]PROMPT:[/bold cyan] Provide a File or Directory path (e.g., /data)")
-        path_str = Prompt.ask("[bold green]>>[/bold green]")
+        self.console.clear()
+        self.draw_header()
         
-        self.console.print("\\n[yellow][1] PLAIN TEXT\\n[2] MARKDOWN\\n[3] JSON[/yellow]")
-        format_choice = IntPrompt.ask("[bold green]>> SELECT FORMAT[/bold green]", choices=["1", "2", "3"], show_choices=False)
+        # Input path prompt
+        path_prompt = Panel(
+            "[bold plum3]Provide a File or Directory path[/bold plum3]\n[grey74](e.g., /data)[/grey74]",
+            border_style=self.colors["accent"],
+            width=min(self.max_width, self.console.size.width)
+        )
+        self.print_center(path_prompt)
+        path_str = self.input_center('>>')
         
-        merge_choice = Confirm.ask("[bold yellow]>> MERGE_BATCH_INTO_SINGLE_FILE?[/bold yellow]", default=False)
+        # Format selection prompt
+        format_prompt = Panel(
+            "[bold plum3]SELECT OUTPUT FORMAT[/bold plum3]\n\n[grey74][1][/grey74] PLAIN TEXT\n[grey74][2][/grey74] MARKDOWN\n[grey74][3][/grey74] JSON",
+            border_style=self.colors["accent"],
+            width=min(self.max_width, self.console.size.width)
+        )
+        self.print_center(format_prompt)
+        # simple validation loop for numeric choice
+        while True:
+            resp = self.input_center('1/2/3')
+            if resp and resp.strip() in ("1", "2", "3"):
+                format_choice = int(resp.strip())
+                break
+            self.print_center(Panel("[bold yellow]Please enter 1, 2, or 3[/bold yellow]", border_style=self.colors['accent'], width=min(self.max_width, self.console.size.width)))
+        
+        # Merge confirmation prompt
+        merge_prompt = Panel(
+            "[bold plum3]Merge batch into single file?[/bold plum3]",
+            border_style=self.colors["accent"],
+            width=min(self.max_width, self.console.size.width)
+        )
+        self.print_center(merge_prompt)
+        # yes/no prompt
+        while True:
+            resp = self.input_center('y/N')
+            if not resp:
+                merge_choice = False
+                break
+            r = resp.strip().lower()
+            if r in ('y', 'yes'):
+                merge_choice = True
+                break
+            if r in ('n', 'no'):
+                merge_choice = False
+                break
+            self.print_center(Panel("[bold yellow]Please answer Y or N[/bold yellow]", border_style=self.colors['accent'], width=min(self.max_width, self.console.size.width)))
             
         return path_str, format_choice, merge_choice
 
