@@ -57,3 +57,53 @@ If you prefer to run the code natively:
 ### 2. Install Python Requirements
 ```bash
 pip install -r requirements.txt
+```
+
+### 3. Run the Application
+```bash
+python main.py
+```
+
+---
+
+## 🧪 Testing
+
+Vellum follows **MVC architecture** with full unit test coverage:
+
+**Run all tests:**
+```bash
+pytest
+```
+
+**Run with verbose output:**
+```bash
+pytest -v
+```
+
+**Test structure:**
+- `tests/test_model.py` — Model layer (converters, extractors)
+- `tests/test_view.py` — View layer (UI components)
+- `tests/test_controller.py` — Controller layer (orchestration)
+
+See [`TESTING.md`](TESTING.md) for detailed testing documentation and examples.
+
+---
+
+## 🏗 Architecture
+
+Vellum implements **Model-View-Controller (MVC)** separation:
+
+- **Model** (`model/core.py`, `model/converters.py`, `model/outputs.py`) — Business logic and document extraction
+- **View** (`view/ui.py`, `view/interface.py`) — UI rendering and user interaction
+- **Controller** (`main.py`) — Orchestration with dependency injection
+
+This architecture ensures:
+- ✅ Separation of concerns
+- ✅ Independent unit testing of each layer
+- ✅ Easy extensibility for new formats and outputs
+
+---
+
+## 📄 License
+
+[View License](LICENSE)

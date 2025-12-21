@@ -15,14 +15,16 @@ from rich.table import Table
 from rich.align import Align
 import readchar
 from pathlib import Path
+from typing import Optional
+from view.interface import UIInterface
 
 
-class RetroCLI:
-    def __init__(self):
-        self.max_width = 120  # 60% of typical terminal (200 chars)
-        self.console = Console()
+class RetroCLI(UIInterface):
+    def __init__(self, console: Optional[Console] = None, max_width: int = 120, colors: Optional[dict] = None):
+        self.max_width = max_width
+        self.console = console or Console()
         # color scheme (hex values for consistency)
-        self.colors = {
+        default_colors = {
             "border": "#9aa0a6",  # soft grey for borders
             "prompt": "#e9d8ff",  # softest purple for prompts
             "logo": "#b57edc",  # lavender for logo
@@ -31,6 +33,7 @@ class RetroCLI:
             "progress": "#6ea8fe",  # soft blue for progress indicators,
             "options": "#7dd9d8", # soft cyan for output options
         }
+        self.colors = {**default_colors, **(colors or {})}
 
     def print_center(self, renderable):
         """Print a renderable centered within the configured console width."""
@@ -38,19 +41,11 @@ class RetroCLI:
         self.console.print(Align.center(renderable, width=term_width))
 
     def input_center(self, prompt_symbol=">>: "):
-        """Show a left-justified prompt within the centered max-width layout.
-
-        The prompt_symbol appears at the left edge of the max-width panel,
-        which is itself centered on the terminal.
-        """
         term_width = self.console.size.width
         panel_width = min(self.max_width, term_width)
 
-        # Left-justify the prompt with left padding to align with the centered panel
         left_padding = (term_width - panel_width) // 2
         prompt_str = " " * left_padding + prompt_symbol
-
-        # Render with markup for color (use prompt color)
         markup = f"[{self.colors['prompt']}]" + prompt_str + "[/]"
         return self.console.input(markup, markup=True)
 
@@ -65,18 +60,14 @@ class RetroCLI:
       ╚═══╝  ╚══════╝╚══════╝╚══════╝ ╚═════╝ ╚═╝     ╚═╝
         """
         subtitle = f"{self.VERSION}"
-
-        # Calculate padding to center the subtitle
-        # Assuming ascii_logo's widest line is around 60-70 chars for centering purposes
         logo_width = max(len(line) for line in ascii_logo.splitlines())
-        subtitle_width = len(subtitle) - 1  # account for rich's markup
+        subtitle_width = len(subtitle) - 1
         padding = (logo_width - subtitle_width) // 2
 
         self.print_center(
             Panel(
                 Align.center(
-                    Text(ascii_logo, style=self.colors["logo"])
-                    + Text(
+                    Text(ascii_logo, style=self.colors["logo"]) + Text(
                         "\n" + " " * padding + subtitle.lower(),
                         style=f"{self.colors['prompt']}",
                     )
@@ -87,16 +78,12 @@ class RetroCLI:
         )
 
     def select_files(self, files: list[Path]) -> list[Path]:
-        """File selection using arrow keys and Enter. Header stays visible."""
-
         selected_files = []
         current_index = 0
-
         while True:
             self.console.clear()
             self.draw_header()
 
-            # Build table with highlighted current selection
             table = Table(
                 title=f"[{self.colors['prompt']}]select files for conversion[/]",
                 show_header=False,
@@ -114,7 +101,6 @@ class RetroCLI:
                     filename_text = file.name
                 table.add_row(f"{marker} {checkbox} {filename_text}")
 
-            # Center the table
             self.print_center(
                 Panel(
                     table,
@@ -132,26 +118,26 @@ class RetroCLI:
 
             key = readchar.readchar()
 
-            if key == "\x1b":  # Escape sequence
+            if key == "\x1b":
                 next1 = readchar.readchar()
                 next2 = readchar.readchar()
                 if next1 == "[":
-                    if next2 == "A":  # Up arrow
+                    if next2 == "A":
                         current_index = (current_index - 1) % len(files)
-                    elif next2 == "B":  # Down arrow
+                    elif next2 == "B":
                         current_index = (current_index + 1) % len(files)
-            elif key == " ":  # Space to toggle
+            elif key == " ":
                 file = files[current_index]
                 if file in selected_files:
                     selected_files.remove(file)
                 else:
                     selected_files.append(file)
-            elif key in ("\r", "\n"):  # Enter to confirm
+            elif key in ("\r", "\n"):
                 break
-            elif key.lower() == "a":  # 'a' to select all
+            elif key.lower() == "a":
                 selected_files = list(files)
                 break
-            elif key.lower() == "q":  # 'q' to quit/go back
+            elif key.lower() == "q":
                 break
 
         return selected_files
@@ -160,16 +146,14 @@ class RetroCLI:
         self.console.clear()
         self.draw_header()
 
-        # Input path prompt
         path_prompt = Panel(
-            f"[{self.colors['prompt']}]provide a file or directory path[/] [{self.colors['options']}](e.g., /data)[/]",
+            f"[{self.colors['prompt']}]provide a file or directory path[/] [{self.colors['options']}](e.g. source.pdf or /data)[/]",
             border_style=self.colors["border"],
             width=min(self.max_width, self.console.size.width),
         )
         self.print_center(path_prompt)
         path_str = self.input_center()
 
-        # Format selection prompt
         format_prompt = Panel(
             (f"[{self.colors['prompt']}]select output format[/]\n\n"
              f"[{self.colors['border']}][1][/] [{self.colors["options"]}]plain text[/]\n"
@@ -179,7 +163,6 @@ class RetroCLI:
             width=min(self.max_width, self.console.size.width),
         )
         self.print_center(format_prompt)
-        # simple validation loop for numeric choice
         while True:
             resp = self.input_center()
             if resp and resp.strip() in ("1", "2", "3"):
@@ -193,14 +176,12 @@ class RetroCLI:
                 )
             )
 
-        # Merge confirmation prompt
         merge_prompt = Panel(
             f"[{self.colors['prompt']}]merge batch into single file [{self.colors['options']}](y/[bold]N[/])[/]?",
             border_style=self.colors["border"],
             width=min(self.max_width, self.console.size.width),
         )
         self.print_center(merge_prompt)
-        # yes/no prompt
         while True:
             resp = self.input_center()
             if not resp:
@@ -224,7 +205,6 @@ class RetroCLI:
         return path_str, format_choice, merge_choice
 
     def get_progress_bar(self):
-        # Return a context manager that renders the Progress inside a centered Panel
         @contextmanager
         def _progress_ctx():
             progress = Progress(
@@ -253,11 +233,6 @@ class RetroCLI:
         return _progress_ctx()
 
     def print_panel(self, content: str, content_color_key: str = "prompt"):
-        """Create a centered Panel with the project's standard border and print it.
-
-        `content` may contain plain text; `content_color_key` selects the text color
-        from `self.colors`.
-        """
         panel = Panel(
             f"[{self.colors[content_color_key]}]{content}[/]",
             border_style=self.colors["border"],

@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from core import OutputHandler
+from model.core import OutputHandler
 
 class PlainTextHandler(OutputHandler):
     def save(self, content: str, destination: Path):

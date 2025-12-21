@@ -1,8 +1,8 @@
 import os
 from pathlib import Path
-from interface import RetroCLI
-from converters import PDFConverter, EPubConverter
-from outputs import PlainTextHandler, MarkdownHandler, JSONHandler
+from view.ui import RetroCLI
+from model.converters import PDFConverter, EPubConverter
+from model.outputs import PlainTextHandler, MarkdownHandler, JSONHandler
 import time
 
 def get_converter(file_path: Path):
@@ -10,8 +10,8 @@ def get_converter(file_path: Path):
     ext = file_path.suffix.lower()
     return ext_map.get(ext)(file_path) if ext in ext_map else None
 
-def main():
-    ui = RetroCLI()
+def main(ui=None):
+    ui = ui or RetroCLI()
     ui.draw_header()
     
     input_str, format_choice, merge_enabled = ui.get_user_input()
@@ -45,7 +45,17 @@ def main():
             progress.update(task_id, description=f"converting {file.name}...", completed=0)
             converter = get_converter(file)
             if converter:
-                content = converter.extract_content()
+                # provide a progress callback that updates the per-file task
+                def _make_cb(tid, fname):
+                    def _cb(current, total):
+                        try:
+                            pct = int((current / total) * 100) if total else 100
+                            progress.update(tid, completed=pct, description=f"converting {fname}...")
+                        except Exception:
+                            pass
+                    return _cb
+
+                content = converter.extract_content(progress_callback=_make_cb(task_id, file.name))
                 if merge_enabled:
                     accumulator.append(f"\n--- start source: {file.name} ---\n{content}")
                 else:
@@ -54,7 +64,7 @@ def main():
                 progress.update(task_id, completed=100, description=f"done {file.name}")
 
     if merge_enabled and accumulator:
-        output_name = input_path / "vellum_merged_output" if input_path.is_dir() else input_path.with_name(f"{input_path.stem}_merged")
+        output_name = input_path / "merged_output" if input_path.is_dir() else input_path.with_name(f"{input_path.stem}_merged")
         handler.save("\n\n".join(accumulator), output_name)
         ui.show_merge_complete(output_name.name)
 
