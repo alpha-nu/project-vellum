@@ -28,7 +28,8 @@ class RetroCLI:
             "logo": "#b57edc",  # lavender for logo
             "error": "#ff6b81",  # rosy for errors
             "confirm": "#20b2aa",  # teal for confirmations
-            "progress": "#6ea8fe",  # soft blue for progress indicators
+            "progress": "#6ea8fe",  # soft blue for progress indicators,
+            "options": "#7dd9d8", # soft cyan for output options
         }
 
     def print_center(self, renderable):
@@ -105,10 +106,10 @@ class RetroCLI:
             table.add_column("file", style=self.colors["border"])
 
             for i, file in enumerate(files):
-                checkbox = f"[{self.colors['prompt']}]✓[/]" if file in selected_files else f"[{self.colors['prompt']}]◯[/]"
-                marker = "→" if i == current_index else " "
+                checkbox = f"[{self.colors['options']}]✔[/]" if file in selected_files else f"[{self.colors['options']}]❏[/]"
+                marker = f"[{self.colors['options']}]►[/]" if i == current_index else " "
                 if i == current_index:
-                    filename_text = f"[{self.colors['prompt']}]" + file.name + "[/]"
+                    filename_text = f"[{self.colors['options']}]" + file.name + "[/]"
                 else:
                     filename_text = file.name
                 table.add_row(f"{marker} {checkbox} {filename_text}")
@@ -123,7 +124,7 @@ class RetroCLI:
             )
             self.print_center(
                 Panel(
-                    f"[{self.colors['prompt']}]↑/↓ navigate  space toggle  enter confirm[/]",
+                    f"[{self.colors['prompt']}][{self.colors["options"]}]⬆︎ /⬇︎[/] :navigate  [{self.colors["options"]}][SPACE][/]:toggle  [{self.colors["options"]}][ENTER][/]:confirm[/]",
                     border_style=self.colors["border"],
                     width=min(self.max_width, self.console.size.width),
                 )
@@ -161,7 +162,7 @@ class RetroCLI:
 
         # Input path prompt
         path_prompt = Panel(
-            f"[{self.colors['prompt']}]provide a file or directory path[/]\n[{self.colors['border']}](e.g., /data)[/]",
+            f"[{self.colors['prompt']}]provide a file or directory path[/] [{self.colors['options']}](e.g., /data)[/]",
             border_style=self.colors["border"],
             width=min(self.max_width, self.console.size.width),
         )
@@ -170,7 +171,10 @@ class RetroCLI:
 
         # Format selection prompt
         format_prompt = Panel(
-            f"[{self.colors['prompt']}]select output format[/]\n\n[{self.colors['border']}][1][/] plain text\n[{self.colors['border']}][2][/] markdown\n[{self.colors['border']}][3][/] json",
+            (f"[{self.colors['prompt']}]select output format[/]\n\n"
+             f"[{self.colors['border']}][1][/] [{self.colors["options"]}]plain text[/]\n"
+             f"[{self.colors['border']}][2][/] [{self.colors["options"]}]markdown[/]\n"
+             f"[{self.colors['border']}][3][/] [{self.colors["options"]}]json[/]"),
             border_style=self.colors["border"],
             width=min(self.max_width, self.console.size.width),
         )
@@ -191,7 +195,7 @@ class RetroCLI:
 
         # Merge confirmation prompt
         merge_prompt = Panel(
-            f"[{self.colors['prompt']}]merge batch into single file?[/]",
+            f"[{self.colors['prompt']}]merge batch into single file [{self.colors['options']}](y/[bold]N[/])[/]?",
             border_style=self.colors["border"],
             width=min(self.max_width, self.console.size.width),
         )
