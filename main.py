@@ -57,7 +57,7 @@ def main(ui=None):
                             progress.update(
                                 tid,
                                 completed=pct,
-                                description=f"[{ui.colors['progress']}]converting[/] [{ui.colors['options']}]{fname}[/]",
+                                description=f"[{ui.colors['progress']}]converting {fname}[/]",
                             )
                         except Exception:
                             pass

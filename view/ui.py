@@ -211,9 +211,14 @@ class RetroCLI(UIInterface):
         @contextmanager
         def _progress_ctx():
             progress = Progress(
-                TextColumn("[progress.description]{task.description}"),
-                BarColumn(bar_width=None),
-                TextColumn("{task.percentage:>3.0f}%"),
+                TextColumn("{task.description}"),
+                BarColumn(
+                    bar_width=None,
+                    style=self.colors["border"],
+                    complete_style=self.colors["confirm"],
+                    finished_style=self.colors["confirm"],
+                ),
+                TextColumn(f"[{self.colors['confirm']}]{{task.percentage:>3.0f}}%[/]"),
                 TimeElapsedColumn(),
                 TimeRemainingColumn(),
                 console=self.console,
@@ -252,7 +257,7 @@ class RetroCLI(UIInterface):
     def show_merge_complete(self, output_name: str):
         content = (
             f"[{self.colors['confirm']}]merge complete[/]\n"
-            f"[{self.colors['border']}] {output_name} [/]")
+            f"[{self.colors['confirm']}] {output_name} [/]")
         panel = Panel(
             Align.center(Text.from_markup(content)),
             border_style=self.colors["border"],
