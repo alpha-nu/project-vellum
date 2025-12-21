@@ -251,3 +251,44 @@ class RetroCLI:
                     pass
 
         return _progress_ctx()
+
+    def print_panel(self, content: str, content_color_key: str = "prompt"):
+        """Create a centered Panel with the project's standard border and print it.
+
+        `content` may contain plain text; `content_color_key` selects the text color
+        from `self.colors`.
+        """
+        panel = Panel(
+            f"[{self.colors[content_color_key]}]{content}[/]",
+            border_style=self.colors["border"],
+            width=min(self.max_width, self.console.size.width),
+        )
+        self.print_center(panel)
+
+    def show_error(self, message: str):
+        self.print_panel(message, content_color_key="error")
+
+    def show_no_files(self):
+        self.print_panel("no compatible files found", content_color_key="error")
+
+    def show_merge_complete(self, output_name: str):
+        content = (
+            f"[{self.colors['confirm']}]merge complete[/]\n"
+            f"[{self.colors['border']}] {output_name} [/]")
+        panel = Panel(
+            Align.center(Text.from_markup(content)),
+            border_style=self.colors["border"],
+            width=min(self.max_width, self.console.size.width),
+        )
+        self.print_center(panel)
+
+    def show_shutdown(self, elapsed_seconds: float):
+        content = (
+            f"[{self.colors['confirm']}]conversion complete[/]\n"
+            f"[{self.colors['progress']}]run time: {elapsed_seconds:.2f}s[/]")
+        panel = Panel(
+            Align.center(Text.from_markup(content)),
+            border_style=self.colors["border"],
+            width=min(self.max_width, self.console.size.width),
+        )
+        self.print_center(panel)
