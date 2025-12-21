@@ -8,6 +8,12 @@ import main as main_module
 class FakeUI:
     def __init__(self, tmp_file: Path):
         self._tmp = tmp_file
+        self.colors = {
+            "prompt": "white",
+            "progress": "cyan",
+            "options": "cyan",
+            "confirm": "green",
+        }
 
     def draw_header(self):
         pass

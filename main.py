@@ -42,7 +42,11 @@ def main(ui=None):
 
         for file in files:
             task_id = tasks[file]
-            progress.update(task_id, description=f"converting {file.name}...", completed=0)
+            progress.update(
+                task_id,
+                description=f"[{ui.colors['progress']}]converting[/] [{ui.colors['options']}]{file.name}[/]",
+                completed=0,
+            )
             converter = get_converter(file)
             if converter:
                 # provide a progress callback that updates the per-file task
@@ -50,7 +54,11 @@ def main(ui=None):
                     def _cb(current, total):
                         try:
                             pct = int((current / total) * 100) if total else 100
-                            progress.update(tid, completed=pct, description=f"converting {fname}...")
+                            progress.update(
+                                tid,
+                                completed=pct,
+                                description=f"[{ui.colors['progress']}]converting[/] [{ui.colors['options']}]{fname}[/]",
+                            )
                         except Exception:
                             pass
                     return _cb
@@ -61,7 +69,11 @@ def main(ui=None):
                 else:
                     handler.save(content, file)
                 # mark file as completed
-                progress.update(task_id, completed=100, description=f"done {file.name}")
+                progress.update(
+                    task_id,
+                    completed=100,
+                    description=f"[{ui.colors['confirm']}]done {file.name}[/]",
+                )
 
     if merge_enabled and accumulator:
         output_name = input_path / "merged_output" if input_path.is_dir() else input_path.with_name(f"{input_path.stem}_merged")

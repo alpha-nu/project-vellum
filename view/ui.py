@@ -29,7 +29,7 @@ class RetroCLI(UIInterface):
             "prompt": "#e9d8ff",  # softest purple for prompts
             "logo": "#b57edc",  # lavender for logo
             "error": "#ff6b81",  # rosy for errors
-            "confirm": "#20b2aa",  # teal for confirmations
+            "confirm": "green",  # green for confirmations
             "progress": "#6ea8fe",  # soft blue for progress indicators,
             "options": "#7dd9d8", # soft cyan for output options
         }
@@ -84,10 +84,13 @@ class RetroCLI(UIInterface):
             self.console.clear()
             self.draw_header()
 
+            panel_width = min(self.max_width, self.console.size.width)
+            table_width = panel_width - 4
+
             table = Table(
                 title=f"[{self.colors['prompt']}]select files for conversion[/]",
                 show_header=False,
-                width=min(self.max_width, self.console.size.width),
+                width=table_width,
                 border_style=self.colors["border"],
             )
             table.add_column("file", style=self.colors["border"])
@@ -105,14 +108,14 @@ class RetroCLI(UIInterface):
                 Panel(
                     table,
                     border_style=self.colors["border"],
-                    width=min(self.max_width, self.console.size.width),
+                    width=panel_width,
                 )
             )
             self.print_center(
                 Panel(
                     f"[{self.colors['prompt']}][{self.colors["options"]}]⬆︎ /⬇︎[/] :navigate  [{self.colors["options"]}][SPACE][/]:toggle  [{self.colors["options"]}][ENTER][/]:confirm[/]",
                     border_style=self.colors["border"],
-                    width=min(self.max_width, self.console.size.width),
+                    width=panel_width,
                 )
             )
 
@@ -262,7 +265,7 @@ class RetroCLI(UIInterface):
             f"[{self.colors['confirm']}]conversion complete[/]\n"
             f"[{self.colors['progress']}]run time: {elapsed_seconds:.2f}s[/]")
         panel = Panel(
-            Align.center(Text.from_markup(content)),
+            Text.from_markup(content),
             border_style=self.colors["border"],
             width=min(self.max_width, self.console.size.width),
         )
