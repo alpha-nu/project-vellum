@@ -1,7 +1,6 @@
 from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
-from rich.prompt import Prompt, IntPrompt, Confirm
 from rich.progress import (
     Progress,
     TextColumn,
@@ -108,10 +107,10 @@ class RetroCLI(UIInterface):
         default_colors = {
             "border": "#9aa0a6",  # soft grey for borders
             "prompt": "#e9d8ff",  # softest purple for prompts
-            "logo": "#b57edc",  # lavender for logo
+            "logo": "#c25a1a",  # lavender for logo
             "error": "#ff6b81",  # rosy for errors
-            "confirm": "green",  # green for confirmations
-            "progress": "#6ea8fe",  # soft blue for progress indicators,
+            "confirm": "#52d9d8",  # green for confirmations
+            "progress": "#c9a961",  # soft blue for progress indicators,
             "options": "#7dd9d8", # soft cyan for output options
         }
         self.colors = {**default_colors, **(colors or {})}
@@ -297,7 +296,7 @@ class RetroCLI(UIInterface):
                     bar_width=None,
                     style=self.colors["border"],
                     complete_style=self.colors["progress"],
-                    finished_style=self.colors["confirm"],
+                    finished_style=self.colors["border"],
                 ),
                 StyledPercentageColumn(self.colors),
                 StyledTimeElapsedColumn(self.colors["progress"]),
