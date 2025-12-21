@@ -8,7 +8,7 @@ class PlainTextHandler(OutputHandler):
 
 class MarkdownHandler(OutputHandler):
     def save(self, content: str, destination: Path):
-        md_content = f"# SOURCE: {destination.name}\n\n{content}"
+        md_content = f"# source: {destination.name}\n\n{content}"
         destination.with_suffix(".md").write_text(md_content, encoding="utf-8")
 
 class JSONHandler(OutputHandler):

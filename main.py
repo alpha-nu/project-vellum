@@ -21,8 +21,8 @@ def main():
     
     if not input_path.exists():
         error_panel = Align.center(Panel(
-            "[bold red]FATAL ERROR: PATH NOT FOUND[/bold red]",
-            border_style="grey74",
+            f"[{ui.colors['error']}]fatal error: path not found[/]",
+            border_style=ui.colors['border'],
             width=min(ui.max_width, ui.console.size.width)
         ))
         ui.console.print(error_panel)
@@ -37,8 +37,8 @@ def main():
     
     if not files:
         no_files_panel = Align.center(Panel(
-            "[bold yellow]NO COMPATIBLE FILES FOUND[/bold yellow]",
-            border_style="grey74",
+            f"[{ui.colors['error']}]no compatible files found[/]",
+            border_style=ui.colors['border'],
             width=min(ui.max_width, ui.console.size.width)
         ))
         ui.console.print(no_files_panel)
@@ -54,31 +54,31 @@ def main():
 
         for file in files:
             task_id = tasks[file]
-            progress.update(task_id, description=f"[white]Converting {file.name}...[/white]", completed=0)
+            progress.update(task_id, description=f"converting {file.name}...", completed=0)
             converter = get_converter(file)
             if converter:
                 content = converter.extract_content()
                 if merge_enabled:
-                    accumulator.append(f"\n--- START SOURCE: {file.name} ---\n{content}")
+                    accumulator.append(f"\n--- start source: {file.name} ---\n{content}")
                 else:
                     handler.save(content, file)
                 # mark file as completed
-                progress.update(task_id, completed=100, description=f"[green]Done {file.name}[/green]")
+                progress.update(task_id, completed=100, description=f"done {file.name}")
 
     if merge_enabled and accumulator:
-        output_name = input_path / "VELLUM_MERGED_OUTPUT" if input_path.is_dir() else input_path.with_name(f"{input_path.stem}_merged")
+        output_name = input_path / "vellum_merged_output" if input_path.is_dir() else input_path.with_name(f"{input_path.stem}_merged")
         handler.save("\n\n".join(accumulator), output_name)
         merge_complete_panel = Align.center(Panel(
-            f"[bold plum3]MERGE COMPLETE[/bold plum3]\n[grey74]{output_name.name}[/grey74]",
-            border_style="grey74",
+            f"[{ui.colors['confirm']}]merge complete[/]\n[{ui.colors['border']}] {output_name.name} [/]",
+            border_style=ui.colors['border'],
             width=min(ui.max_width, ui.console.size.width)
         ))
         ui.console.print(merge_complete_panel)
 
     elapsed = time.perf_counter() - start_time
     shutdown_panel = Align.center(Panel(
-        f"[bold plum3]CONVERSION COMPLETE[/bold plum3]\n[grey74]Run time: {elapsed:.2f}s[/grey74]",
-        border_style="grey74",
+        f"[{ui.colors['confirm']}]conversion complete[/]\n[{ui.colors['progress']}]run time: {elapsed:.2f}s[/]",
+        border_style=ui.colors['border'],
         width=min(ui.max_width, ui.console.size.width)
     ))
     ui.console.print(shutdown_panel)
