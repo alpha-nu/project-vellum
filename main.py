@@ -38,7 +38,7 @@ def main(ui=None):
     start_time = time.perf_counter()
     with ui.get_progress_bar() as progress:
         # create a progress bar task per file (0-100). We'll mark each file 100 when done.
-        tasks = {file: progress.add_task(f"{file.name}", total=100) for file in files}
+        tasks = {file: progress.add_task(f"[{ui.colors['border']}]{file.name}[/]", total=100) for file in files}
 
         for file in files:
             task_id = tasks[file]

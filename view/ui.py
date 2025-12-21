@@ -19,6 +19,38 @@ from typing import Optional
 from view.interface import UIInterface
 
 
+class _StyledTimeMixin:
+    def __init__(self, style: str, attr: str):
+        super().__init__()
+        self._style = style
+        self._attr = attr
+
+    def render(self, task):
+        value = getattr(task, self._attr)
+        if value is None:
+            return Text("00:00", style=self._style)
+        return Text(self._format_time(value), style=self._style)
+
+    @staticmethod
+    def _format_time(seconds: float) -> str:
+        secs = int(seconds)
+        hours, remainder = divmod(secs, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        if hours:
+            return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+        return f"{minutes:02d}:{seconds:02d}"
+
+
+class StyledTimeElapsedColumn(_StyledTimeMixin, TimeElapsedColumn):
+    def __init__(self, style: str):
+        _StyledTimeMixin.__init__(self, style, "elapsed")
+
+
+class StyledTimeRemainingColumn(_StyledTimeMixin, TimeRemainingColumn):
+    def __init__(self, style: str):
+        _StyledTimeMixin.__init__(self, style, "time_remaining")
+
+
 class RetroCLI(UIInterface):
     def __init__(self, console: Optional[Console] = None, max_width: int = 120, colors: Optional[dict] = None):
         self.max_width = max_width
@@ -215,12 +247,11 @@ class RetroCLI(UIInterface):
                 BarColumn(
                     bar_width=None,
                     style=self.colors["border"],
-                    complete_style=self.colors["confirm"],
+                    complete_style=self.colors["progress"],
                     finished_style=self.colors["confirm"],
                 ),
-                TextColumn(f"[{self.colors['confirm']}]{{task.percentage:>3.0f}}%[/]"),
-                TimeElapsedColumn(),
-                TimeRemainingColumn(),
+                TextColumn(f"[{self.colors['progress']}]{{task.percentage:>3.0f}}%[/]"),
+                StyledTimeRemainingColumn(self.colors["progress"]),
                 console=self.console,
                 transient=True,
             )
