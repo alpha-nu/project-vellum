@@ -40,15 +40,41 @@ class _StyledTimeMixin:
             return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
         return f"{minutes:02d}:{seconds:02d}"
 
-
-class StyledTimeElapsedColumn(_StyledTimeMixin, TimeElapsedColumn):
-    def __init__(self, style: str):
-        _StyledTimeMixin.__init__(self, style, "elapsed")
-
-
 class StyledTimeRemainingColumn(_StyledTimeMixin, TimeRemainingColumn):
     def __init__(self, style: str):
         _StyledTimeMixin.__init__(self, style, "time_remaining")
+    
+    def render(self, task):
+        fields = getattr(task, "fields", {}) or {}
+        status = fields.get("status", "pending")
+        
+        # When done, show elapsed time instead of remaining
+        if status == "done":
+            elapsed = task.elapsed
+            if elapsed is None:
+                return Text("00:00", style=self._style)
+            return Text(f"{self._format_time(elapsed)}", style=self._style)
+        
+        # Otherwise show remaining time (default behavior)
+        return super().render(task)
+
+
+class StyledDescriptionColumn(TextColumn):
+    def __init__(self, colors: dict):
+        super().__init__("[progress.description]{task.description}")
+        self.colors = colors
+
+    def render(self, task):
+        fields = getattr(task, "fields", {}) or {}
+        status = fields.get("status", "pending")
+        filename = fields.get("filename", "")
+
+        if status == "converting":
+            return Text.from_markup(f"[{self.colors['progress']}]converting [italic]{filename}[/][/]")
+        elif status == "done":
+            return Text.from_markup(f"[{self.colors['confirm']}]✓ {filename}[/]")
+        else:
+            return Text.from_markup(f"[{self.colors['border']}]{filename}[/]")
 
 
 class RetroCLI(UIInterface):
@@ -243,7 +269,7 @@ class RetroCLI(UIInterface):
         @contextmanager
         def _progress_ctx():
             progress = Progress(
-                TextColumn("{task.description}"),
+                StyledDescriptionColumn(self.colors),
                 BarColumn(
                     bar_width=None,
                     style=self.colors["border"],

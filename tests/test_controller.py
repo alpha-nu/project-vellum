@@ -30,9 +30,9 @@ class FakeUI:
             def __init__(self):
                 self.tasks = {}
 
-            def add_task(self, desc, total=100):
+            def add_task(self, desc, total=100, **fields):
                 tid = len(self.tasks) + 1
-                self.tasks[tid] = {"desc": desc, "completed": 0}
+                self.tasks[tid] = {"desc": desc, "completed": 0, **fields}
                 return tid
 
             def update(self, tid, **kwargs):
