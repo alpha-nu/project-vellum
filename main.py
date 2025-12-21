@@ -42,16 +42,18 @@ def main(ui=None):
 
         for file in files:
             task_id = tasks[file]
+            file_start = time.perf_counter()
             progress.update(
                 task_id,
                 status="converting",
                 filename=file.name,
                 completed=0,
+                start_time=file_start,
             )
             converter = get_converter(file)
             if converter:
                 # provide a progress callback that updates the per-file task
-                def _make_cb(tid, fname):
+                def _make_cb(tid, fname, start):
                     def _cb(current, total):
                         try:
                             pct = int((current / total) * 100) if total else 100
@@ -60,22 +62,25 @@ def main(ui=None):
                                 completed=pct,
                                 status="converting",
                                 filename=fname,
+                                start_time=start,
                             )
                         except Exception:
                             pass
                     return _cb
 
-                content = converter.extract_content(progress_callback=_make_cb(task_id, file.name))
+                content = converter.extract_content(progress_callback=_make_cb(task_id, file.name, file_start))
                 if merge_enabled:
                     accumulator.append(f"\n--- start source: {file.name} ---\n{content}")
                 else:
                     handler.save(content, file)
                 # mark file as completed
+                file_elapsed = time.perf_counter() - file_start
                 progress.update(
                     task_id,
                     completed=100,
                     status="done",
                     filename=file.name,
+                    conversion_time=file_elapsed,
                 )
 
     if merge_enabled and accumulator:

@@ -7,7 +7,6 @@ from rich.progress import (
     TextColumn,
     BarColumn,
     TimeRemainingColumn,
-    TimeElapsedColumn,
 )
 from rich.live import Live
 from contextlib import contextmanager
@@ -40,23 +39,47 @@ class _StyledTimeMixin:
             return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
         return f"{minutes:02d}:{seconds:02d}"
 
-class StyledTimeRemainingColumn(_StyledTimeMixin, TimeRemainingColumn):
+class StyledTimeElapsedColumn(_StyledTimeMixin, TimeRemainingColumn):
     def __init__(self, style: str):
-        _StyledTimeMixin.__init__(self, style, "time_remaining")
+        _StyledTimeMixin.__init__(self, style, "elapsed")
     
     def render(self, task):
         fields = getattr(task, "fields", {}) or {}
         status = fields.get("status", "pending")
         
-        # When done, show elapsed time instead of remaining
+        # When done, show final conversion time
         if status == "done":
-            elapsed = task.elapsed
-            if elapsed is None:
+            conversion_time = fields.get("conversion_time")
+            if conversion_time is None:
                 return Text("00:00", style=self._style)
-            return Text(f"{self._format_time(elapsed)}", style=self._style)
+            return Text(f"{self._format_time(conversion_time)}", style=self._style)
         
-        # Otherwise show remaining time (default behavior)
-        return super().render(task)
+        # While converting, calculate elapsed from start_time
+        if status == "converting":
+            start_time = fields.get("start_time")
+            if start_time is not None:
+                import time
+                elapsed = time.perf_counter() - start_time
+                return Text(f"{self._format_time(elapsed)}", style=self._style)
+        
+        # Pending or no start time
+        return Text("00:00", style=self._style)
+
+
+class StyledPercentageColumn(TextColumn):
+    def __init__(self, colors: dict):
+        super().__init__("{task.percentage:>3.0f}%")
+        self.colors = colors
+
+    def render(self, task):
+        fields = getattr(task, "fields", {}) or {}
+        status = fields.get("status", "pending")
+        percentage = f"{task.percentage:>3.0f}%"
+
+        if status == "done":
+            return Text.from_markup(f"[{self.colors['confirm']}]{percentage}[/]")
+        else:
+            return Text.from_markup(f"[{self.colors['progress']}]{percentage}[/]")
 
 
 class StyledDescriptionColumn(TextColumn):
@@ -276,8 +299,8 @@ class RetroCLI(UIInterface):
                     complete_style=self.colors["progress"],
                     finished_style=self.colors["confirm"],
                 ),
-                TextColumn(f"[{self.colors['progress']}]{{task.percentage:>3.0f}}%[/]"),
-                StyledTimeRemainingColumn(self.colors["progress"]),
+                StyledPercentageColumn(self.colors),
+                StyledTimeElapsedColumn(self.colors["progress"]),
                 console=self.console,
                 transient=True,
             )
