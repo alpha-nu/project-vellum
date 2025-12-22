@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 import types
 
-import main as main_module
+from controller.converter_controller import ConverterController
 
 
 class FakeUI:
@@ -78,12 +78,16 @@ def test_main_controller_flow(tmp_path, monkeypatch):
     tmp_file.write_text("pdf content")
 
     # monkeypatch get_converter to return FakeConverter
-    monkeypatch.setattr(main_module, "get_converter", lambda p: FakeConverter(p))
+    monkeypatch.setattr(
+        "controller.converter_controller.ConverterController.get_converter", 
+        lambda self, p: FakeConverter(p)
+    )
 
     ui = FakeUI(tmp_file)
+    controller = ConverterController(ui)
 
-    # run main with injected UI
-    main_module.main(ui=ui)
+    # run controller
+    controller.run()
 
     # verify output file was written by PlainTextHandler
     out = tmp_file.with_suffix('.txt')
