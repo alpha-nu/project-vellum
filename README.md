@@ -68,16 +68,25 @@ python main.py
 
 ## 🧪 Testing
 
-Vellum follows **MVC architecture** with full unit test coverage:
+Vellum follows **MVC architecture** with full unit test coverage and comprehensive test coverage reporting.
 
-**Run all tests:**
+### Running Tests
+
+**Run all tests with coverage:**
 ```bash
-pytest
+pytest tests/ -v
 ```
 
-**Run with verbose output:**
+**Run specific test files:**
 ```bash
-pytest -v
+pytest tests/test_controller.py -v
+pytest tests/test_model.py -v
+pytest tests/test_view.py -v
+```
+
+**Run without coverage (faster for development):**
+```bash
+pytest tests/ -v --no-cov
 ```
 
 **Test structure:**
@@ -85,7 +94,58 @@ pytest -v
 - `tests/test_view.py` — View layer (UI components)
 - `tests/test_controller.py` — Controller layer (orchestration)
 
-See [`TESTING.md`](TESTING.md) for detailed testing documentation and examples.
+### Coverage Reports
+
+Tests automatically generate coverage reports in multiple formats:
+
+**1. Terminal Report**
+- Displays during test execution
+- Shows coverage percentage per file
+- Lists missing line numbers
+
+**2. HTML Report**
+- Located in `htmlcov/` directory
+- Interactive line-by-line coverage view
+- Color-coded: Green (covered) / Red (not covered)
+
+```bash
+# Open HTML coverage report
+open htmlcov/index.html          # macOS
+xdg-open htmlcov/index.html      # Linux
+```
+
+**3. XML Report**
+- Located at `coverage.xml`
+- For CI/CD tools (Codecov, Coveralls, SonarQube)
+
+### Current Coverage
+
+```
+controller/converter_controller.py  72.60%
+model/converters.py                 28.57%  ⚠️ Needs improvement
+model/core.py                       84.62%
+model/outputs.py                    66.67%
+view/interface.py                  100.00%  ✅
+view/ui.py                          31.96%  ⚠️ Needs improvement
+-------------------------------------------------------------------
+TOTAL                               44.57%
+```
+
+**Coverage Target:** 80% overall
+
+**Priority areas for improvement:**
+- `model/converters.py` — Core extraction logic
+- `model/outputs.py` — Format handlers
+- `view/ui.py` — UI components (lower priority)
+
+### Configuration
+
+Coverage is configured via `.coveragerc` and `pytest.ini`:
+- Tracks `model/`, `view/`, `controller/` modules
+- Excludes test files and virtual environments
+- Generates terminal, HTML, and XML reports
+
+See [`cli_testing_tips.md`](cli_testing_tips.md) for E2E testing strategies and automation patterns.
 
 ---
 
