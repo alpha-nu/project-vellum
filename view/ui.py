@@ -92,7 +92,7 @@ class StyledDescriptionColumn(TextColumn):
         filename = fields.get("filename", "")
 
         if status == "converting":
-            return Text.from_markup(f"[{self.colors['progress']}]converting [italic]{filename}[/][/]")
+            return Text.from_markup(f"[italic {self.colors['progress']}]converting {filename}[/]")
         elif status == "done":
             return Text.from_markup(f"[{self.colors['confirm']}]✓ {filename}[/]")
         else:
