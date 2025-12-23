@@ -17,8 +17,8 @@ class FakeUI:
         pass
 
     def get_user_input(self):
-        # return path_str, format_choice(1=plain), merge(False)
-        return str(self._tmp), 1, False
+        # return path_str, format_choice(1=plain), merge_mode("no_merge")
+        return str(self._tmp), 1, "no_merge"
 
     def select_files(self, files):
         return files
@@ -68,6 +68,11 @@ class FakeConverter:
         if progress_callback:
             progress_callback(1, 1)
         return "dummy"
+    
+    def extract_content_per_item(self, progress_callback=None):
+        if progress_callback:
+            progress_callback(1, 1)
+        return ["page1", "page2", "page3"]
 
 
 def test_main_controller_flow(tmp_path, monkeypatch):
@@ -161,7 +166,7 @@ def test_controller_merge_mode(tmp_path, monkeypatch):
             self.merge_complete_called = False
         
         def get_user_input(self):
-            return str(self._tmp), 1, True  # Enable merge
+            return str(self._tmp), 1, "merge"  # Enable merge
         
         def select_files(self, files):
             return files
@@ -228,7 +233,7 @@ def test_controller_different_formats(tmp_path, monkeypatch):
     for format_choice, expected_ext in [(1, ".txt"), (2, ".md"), (3, ".json")]:
         class FormatUI(FakeUI):
             def get_user_input(self):
-                return str(test_file), format_choice, False
+                return str(test_file), format_choice, "no_merge"
         
         ui = FormatUI(test_file)
         controller = ConverterController(ui)
@@ -281,3 +286,231 @@ def test_controller_get_compatible_files(tmp_path):
     assert "file2.epub" in names
     assert "file4.PDF" in names
     assert "file3.txt" not in names
+
+
+class TestControllerEdgeCases:
+    """Test controller edge cases for complete coverage"""
+    
+    def test_controller_unsupported_file_type(self, tmp_path):
+        """Test get_converter returns None for unsupported file type"""
+        ui = FakeUI(tmp_path / "dummy.pdf")
+        controller = ConverterController(ui)
+        
+        unsupported = tmp_path / "file.docx"
+        result = controller.get_converter(unsupported)
+        assert result is None
+    
+    def test_controller_null_converter_handling(self, tmp_path):
+        """Test controller handles None converter gracefully"""
+        test_file = tmp_path / "test.xyz"  # Unsupported extension
+        test_file.write_text("content")
+        
+        class TestUI(FakeUI):
+            def __init__(self, file):
+                super().__init__(file)
+            
+            def get_user_input(self):
+                return str(self._tmp), 1, "no_merge"
+        
+        ui = TestUI(test_file)
+        controller = ConverterController(ui)
+        # Should handle None converter without crashing
+        controller.run()
+    
+    def test_controller_per_page_no_merge_complete(self, tmp_path, monkeypatch):
+        """Test that per_page mode doesn't call show_merge_complete"""
+        
+        class MockConverter:
+            def __init__(self, path):
+                self.path = path
+            
+            def extract_content(self, progress_callback=None):
+                return "content"
+            
+            def extract_content_per_item(self, progress_callback=None):
+                if progress_callback:
+                    progress_callback(1, 1)
+                return ["page1", "page2"]
+        
+        class MockHandler:
+            def save(self, content, destination):
+                pass
+            
+            def save_multiple(self, contents, destination, source_name):
+                pass
+        
+        test_file = tmp_path / "test.pdf"
+        test_file.write_text("content")
+        
+        merge_called = []
+        
+        class TestUI(FakeUI):
+            def __init__(self, file):
+                super().__init__(file)
+            
+            def get_user_input(self):
+                return str(test_file), 1, "per_page"
+            
+            def show_merge_complete(self, name):
+                merge_called.append(name)
+        
+        monkeypatch.setattr(
+            "controller.converter_controller.ConverterController.get_converter",
+            lambda self, p: MockConverter(p)
+        )
+        monkeypatch.setattr(
+            "controller.converter_controller.ConverterController.FORMAT_HANDLERS",
+            {1: MockHandler(), 2: MockHandler(), 3: MockHandler()}
+        )
+        
+        ui = TestUI(test_file)
+        controller = ConverterController(ui)
+        controller.run()
+        
+        # Merge complete should NOT be called in per_page mode
+        assert len(merge_called) == 0
+    
+    def test_controller_merge_single_file(self, tmp_path, monkeypatch):
+        """Test merge mode with single file creates _merged output"""
+        
+        class MockConverter:
+            def __init__(self, path):
+                self.path = path
+            
+            def extract_content(self, progress_callback=None):
+                if progress_callback:
+                    progress_callback(1, 1)
+                return "test content"
+            
+            def extract_content_per_item(self, progress_callback=None):
+                return ["page1"]
+        
+        class MockHandler:
+            def save(self, content, destination):
+                destination.with_suffix(".txt").write_text(content, encoding="utf-8")
+            
+            def save_multiple(self, contents, destination, source_name):
+                pass
+        
+        test_file = tmp_path / "document.pdf"
+        test_file.write_text("content")
+        
+        merge_complete_name = []
+        
+        class TestUI(FakeUI):
+            def __init__(self, file):
+                super().__init__(file)
+            
+            def get_user_input(self):
+                return str(test_file), 1, "merge"
+            
+            def show_merge_complete(self, name):
+                merge_complete_name.append(name)
+        
+        monkeypatch.setattr(
+            "controller.converter_controller.ConverterController.get_converter",
+            lambda self, p: MockConverter(p)
+        )
+        monkeypatch.setattr(
+            "controller.converter_controller.ConverterController.FORMAT_HANDLERS",
+            {1: MockHandler(), 2: MockHandler(), 3: MockHandler()}
+        )
+        
+        ui = TestUI(test_file)
+        controller = ConverterController(ui)
+        controller.run()
+        
+        # Verify merged output was created
+        assert len(merge_complete_name) == 1
+        assert "merged" in merge_complete_name[0]
+        
+        merged_file = tmp_path / "document_merged.txt"
+        assert merged_file.exists()
+
+
+class TestControllerPerPageMode:
+    """Test controller integration with per_page mode"""
+    
+    def test_controller_per_page_mode(self, tmp_path, monkeypatch):
+        """Test that controller calls extract_content_per_item and save_multiple for per_page mode"""
+        from controller.converter_controller import ConverterController
+        
+        # Track method calls
+        extract_per_item_called = []
+        save_multiple_called = []
+        
+        class MockConverter:
+            def __init__(self, path):
+                self.path = path
+            
+            def extract_content(self, progress_callback=None):
+                return "merged content"
+            
+            def extract_content_per_item(self, progress_callback=None):
+                extract_per_item_called.append(True)
+                if progress_callback:
+                    progress_callback(1, 1)
+                return ["page1", "page2", "page3"]
+        
+        class MockHandler:
+            def save(self, content, destination):
+                pass
+            
+            def save_multiple(self, contents, destination, source_name):
+                save_multiple_called.append((contents, destination, source_name))
+        
+        # Create test file
+        test_file = tmp_path / "test.pdf"
+        test_file.write_text("content")
+        
+        # Mock UI
+        class TestUI:
+            def draw_header(self):
+                pass
+            
+            def get_user_input(self):
+                return str(test_file), 1, "per_page"
+            
+            def select_files(self, files):
+                return files
+            
+            def get_progress_bar(self):
+                from contextlib import contextmanager
+                @contextmanager
+                def _ctx():
+                    class FakeProg:
+                        def add_task(self, *a, **kw):
+                            return 1
+                        def update(self, *a, **kw):
+                            pass
+                    yield FakeProg()
+                return _ctx()
+            
+            def show_error(self, msg):
+                pass
+            
+            def show_shutdown(self, elapsed):
+                pass
+        
+        # Patch converter and handler
+        monkeypatch.setattr(
+            "controller.converter_controller.ConverterController.get_converter",
+            lambda self, p: MockConverter(p)
+        )
+        monkeypatch.setattr(
+            "controller.converter_controller.ConverterController.FORMAT_HANDLERS",
+            {1: MockHandler(), 2: MockHandler(), 3: MockHandler()}
+        )
+        
+        ui = TestUI()
+        controller = ConverterController(ui)
+        controller.run()
+        
+        # Verify per_page methods were called
+        assert len(extract_per_item_called) == 1
+        assert len(save_multiple_called) == 1
+        
+        # Verify save_multiple got the right data
+        contents, dest, source = save_multiple_called[0]
+        assert contents == ["page1", "page2", "page3"]
+        assert dest == test_file

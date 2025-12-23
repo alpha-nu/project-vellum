@@ -230,3 +230,92 @@ class TestOutputHandlersEdgeCases:
             
             output_file = nested_dir / f"nested_file{ext}"
             assert output_file.exists()
+
+
+class TestPerPageOutputHandlers:
+    """Test save_multiple methods in output handlers"""
+    
+    def test_plaintext_save_multiple(self, tmp_path):
+        """Test PlainTextHandler.save_multiple creates numbered files"""
+        handler = PlainTextHandler()
+        destination = tmp_path / "document.pdf"
+        contents = ["Page 1 text", "Page 2 text", "Page 3 text"]
+        
+        handler.save_multiple(contents, destination, "document.pdf")
+        
+        # Check that 3 files were created
+        assert (tmp_path / "document_page_1.txt").exists()
+        assert (tmp_path / "document_page_2.txt").exists()
+        assert (tmp_path / "document_page_3.txt").exists()
+        
+        # Check content
+        assert (tmp_path / "document_page_1.txt").read_text() == "Page 1 text"
+        assert (tmp_path / "document_page_2.txt").read_text() == "Page 2 text"
+        assert (tmp_path / "document_page_3.txt").read_text() == "Page 3 text"
+    
+    def test_markdown_save_multiple(self, tmp_path):
+        """Test MarkdownHandler.save_multiple creates numbered markdown files"""
+        handler = MarkdownHandler()
+        destination = tmp_path / "book.epub"
+        contents = ["Chapter 1", "Chapter 2"]
+        
+        handler.save_multiple(contents, destination, "book.epub")
+        
+        # Check files exist
+        assert (tmp_path / "book_page_1.md").exists()
+        assert (tmp_path / "book_page_2.md").exists()
+        
+        # Check markdown formatting
+        page1 = (tmp_path / "book_page_1.md").read_text()
+        assert page1.startswith("# source: book.epub (page 1)")
+        assert "Chapter 1" in page1
+        
+        page2 = (tmp_path / "book_page_2.md").read_text()
+        assert page2.startswith("# source: book.epub (page 2)")
+        assert "Chapter 2" in page2
+    
+    def test_json_save_multiple(self, tmp_path):
+        """Test JSONHandler.save_multiple creates numbered JSON files"""
+        handler = JSONHandler()
+        destination = tmp_path / "doc.pdf"
+        contents = ["First page", "Second page"]
+        
+        handler.save_multiple(contents, destination, "doc.pdf")
+        
+        # Check files exist
+        assert (tmp_path / "doc_page_1.json").exists()
+        assert (tmp_path / "doc_page_2.json").exists()
+        
+        # Check JSON structure
+        with open(tmp_path / "doc_page_1.json") as f:
+            data1 = json.load(f)
+        assert data1["source"] == "doc.pdf"
+        assert data1["page"] == 1
+        assert data1["content"] == "First page"
+        
+        with open(tmp_path / "doc_page_2.json") as f:
+            data2 = json.load(f)
+        assert data2["source"] == "doc.pdf"
+        assert data2["page"] == 2
+        assert data2["content"] == "Second page"
+    
+    def test_save_multiple_empty_list(self, tmp_path):
+        """Test save_multiple with empty content list"""
+        handler = PlainTextHandler()
+        destination = tmp_path / "empty.pdf"
+        
+        handler.save_multiple([], destination, "empty.pdf")
+        
+        # Should not create any files
+        assert not (tmp_path / "empty_page_1.txt").exists()
+    
+    def test_save_multiple_single_page(self, tmp_path):
+        """Test save_multiple with single page"""
+        handler = PlainTextHandler()
+        destination = tmp_path / "single.pdf"
+        
+        handler.save_multiple(["Only page"], destination, "single.pdf")
+        
+        assert (tmp_path / "single_page_1.txt").exists()
+        assert (tmp_path / "single_page_1.txt").read_text() == "Only page"
+        assert not (tmp_path / "single_page_2.txt").exists()

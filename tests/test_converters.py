@@ -357,3 +357,212 @@ class TestEPubConverter:
         result = converter.extract_content()
         
         assert "Actual content" in result
+
+
+class TestPDFConverterOCREdgeCases:
+    """Test OCR fallback edge cases in PDFConverter"""
+    
+    def test_pdf_converter_ocr_empty_page(self, tmp_path):
+        """Test PDFConverter handles empty pages with OCR fallback"""
+        import fitz
+        
+        # Create PDF with an empty page (no text)
+        pdf_path = tmp_path / "empty.pdf"
+        doc = fitz.open()
+        page = doc.new_page(width=595, height=842)
+        # Don't insert any text, so OCR fallback will trigger
+        doc.save(pdf_path)
+        doc.close()
+        
+        converter = PDFConverter(pdf_path)
+        # This should trigger OCR fallback for empty page
+        content = converter.extract_content()
+        assert isinstance(content, str)  # May be empty but should be string
+        
+    def test_pdf_converter_per_item_ocr_fallback(self, tmp_path):
+        """Test extract_content_per_item with OCR fallback"""
+        import fitz
+        
+        # Create PDF with empty page
+        pdf_path = tmp_path / "ocr_test.pdf"
+        doc = fitz.open()
+        page = doc.new_page()
+        # Empty page triggers OCR
+        doc.save(pdf_path)
+        doc.close()
+        
+        converter = PDFConverter(pdf_path)
+        pages = converter.extract_content_per_item()
+        assert isinstance(pages, list)
+        assert len(pages) == 1
+    
+    def test_pdf_progress_callback_exception(self, tmp_path):
+        """Test PDF converter handles progress callback exceptions"""
+        import fitz
+        
+        pdf_path = tmp_path / "test.pdf"
+        doc = fitz.open()
+        page = doc.new_page()
+        page.insert_text((72, 72), "Test")
+        doc.save(pdf_path)
+        doc.close()
+        
+        def bad_callback(current, total):
+            raise RuntimeError("Progress error")
+        
+        converter = PDFConverter(pdf_path)
+        # Should not raise despite callback raising
+        pages = converter.extract_content_per_item(progress_callback=bad_callback)
+        assert isinstance(pages, list)
+        assert len(pages) == 1
+
+
+class TestEPubConverterEdgeCases:
+    """Test EPUB converter edge cases"""
+    
+    def test_epub_extract_per_item_exception_in_progress(self, tmp_path):
+        """Test that exception in progress callback doesn't break extraction"""
+        from ebooklib import epub
+        
+        epub_path = tmp_path / "test.epub"
+        book = epub.EpubBook()
+        book.set_identifier("test789")
+        book.set_title("Test")
+        book.set_language("en")
+        
+        c1 = epub.EpubHtml(title="Chapter", file_name="c1.xhtml", lang="en")
+        c1.content = "<html><body><p>Text</p></body></html>"
+        book.add_item(c1)
+        book.toc = (c1,)
+        book.spine = ['nav', c1]
+        book.add_item(epub.EpubNcx())
+        book.add_item(epub.EpubNav())
+        
+        epub.write_epub(epub_path, book)
+        
+        def bad_callback(current, total):
+            raise ValueError("Callback error")
+        
+        converter = EPubConverter(epub_path)
+        # Should not raise even though callback raises
+        chapters = converter.extract_content_per_item(progress_callback=bad_callback)
+        assert isinstance(chapters, list)
+
+
+class TestPerPageConverters:
+    """Test extract_content_per_item methods in converters"""
+    
+    def test_pdf_converter_per_item(self, tmp_path):
+        """Test PDFConverter.extract_content_per_item returns list of pages"""
+        import fitz
+        
+        # Create a simple PDF with 3 pages
+        pdf_path = tmp_path / "test.pdf"
+        doc = fitz.open()
+        for i in range(3):
+            page = doc.new_page()
+            page.insert_text((72, 72), f"Page {i+1} content")
+        doc.save(pdf_path)
+        doc.close()
+        
+        converter = PDFConverter(pdf_path)
+        pages = converter.extract_content_per_item()
+        
+        assert isinstance(pages, list)
+        assert len(pages) == 3
+        assert "Page 1 content" in pages[0]
+        assert "Page 2 content" in pages[1]
+        assert "Page 3 content" in pages[2]
+    
+    def test_pdf_converter_per_item_with_progress(self, tmp_path):
+        """Test PDFConverter.extract_content_per_item calls progress callback"""
+        import fitz
+        
+        pdf_path = tmp_path / "test.pdf"
+        doc = fitz.open()
+        for i in range(2):
+            page = doc.new_page()
+            page.insert_text((72, 72), f"Page {i+1}")
+        doc.save(pdf_path)
+        doc.close()
+        
+        calls = []
+        def progress_cb(current, total):
+            calls.append((current, total))
+        
+        converter = PDFConverter(pdf_path)
+        pages = converter.extract_content_per_item(progress_callback=progress_cb)
+        
+        assert len(calls) == 2
+        assert calls[0] == (1, 2)
+        assert calls[1] == (2, 2)
+    
+    def test_epub_converter_per_item(self, tmp_path):
+        """Test EPubConverter.extract_content_per_item returns list of chapters"""
+        from ebooklib import epub
+        
+        # Create a simple EPUB with 2 chapters
+        epub_path = tmp_path / "test.epub"
+        book = epub.EpubBook()
+        book.set_identifier("test123")
+        book.set_title("Test Book")
+        book.set_language("en")
+        
+        c1 = epub.EpubHtml(title="Chapter 1", file_name="chap_01.xhtml", lang="en")
+        c1.content = "<html><body><h1>Chapter 1</h1><p>Content of chapter 1</p></body></html>"
+        
+        c2 = epub.EpubHtml(title="Chapter 2", file_name="chap_02.xhtml", lang="en")
+        c2.content = "<html><body><h1>Chapter 2</h1><p>Content of chapter 2</p></body></html>"
+        
+        book.add_item(c1)
+        book.add_item(c2)
+        book.toc = (c1, c2)
+        book.spine = ['nav', c1, c2]
+        book.add_item(epub.EpubNcx())
+        book.add_item(epub.EpubNav())
+        
+        epub.write_epub(epub_path, book)
+        
+        converter = EPubConverter(epub_path)
+        chapters = converter.extract_content_per_item()
+        
+        assert isinstance(chapters, list)
+        assert len(chapters) >= 2  # At least 2 chapters (may have nav)
+        # Find the chapters with our content
+        chapter1_text = next((ch for ch in chapters if "Content of chapter 1" in ch), None)
+        chapter2_text = next((ch for ch in chapters if "Content of chapter 2" in ch), None)
+        assert chapter1_text is not None
+        assert chapter2_text is not None
+        assert "Chapter 1" in chapter1_text
+        assert "Chapter 2" in chapter2_text
+    
+    def test_epub_converter_per_item_with_progress(self, tmp_path):
+        """Test EPubConverter.extract_content_per_item calls progress callback"""
+        from ebooklib import epub
+        
+        epub_path = tmp_path / "test.epub"
+        book = epub.EpubBook()
+        book.set_identifier("test456")
+        book.set_title("Test")
+        book.set_language("en")
+        
+        c1 = epub.EpubHtml(title="C1", file_name="c1.xhtml", lang="en")
+        c1.content = "<html><body><p>Chapter text</p></body></html>"
+        book.add_item(c1)
+        book.toc = (c1,)
+        book.spine = ['nav', c1]
+        book.add_item(epub.EpubNcx())
+        book.add_item(epub.EpubNav())
+        
+        epub.write_epub(epub_path, book)
+        
+        calls = []
+        def progress_cb(current, total):
+            calls.append((current, total))
+        
+        converter = EPubConverter(epub_path)
+        chapters = converter.extract_content_per_item(progress_callback=progress_cb)
+        
+        # Progress callback should be called for each content item
+        assert len(calls) >= 1
+        assert all(current <= total for current, total in calls)

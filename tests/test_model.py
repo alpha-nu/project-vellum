@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import List
 from model.core import BaseConverter
 
 
@@ -11,6 +12,15 @@ class FakeConverter(BaseConverter):
             if progress_callback:
                 progress_callback(i + 1, total)
         return "\n\n".join(texts)
+    
+    def extract_content_per_item(self, progress_callback=None) -> List[str]:
+        total = 3
+        texts = []
+        for i in range(total):
+            texts.append(f"page {i}")
+            if progress_callback:
+                progress_callback(i + 1, total)
+        return texts
 
 
 def test_fake_converter_progress_called():

@@ -79,13 +79,13 @@ class ConverterController:
         3. Validate path
         4. Handle batch or single file
         5. Process files
-        6. Handle merge if enabled
+        6. Handle merge mode (no_merge, merge, or per_page)
         7. Show completion
         """
         self.ui.draw_header()
         
         # Get user input
-        input_str, format_choice, merge_enabled = self.ui.get_user_input()
+        input_str, format_choice, merge_mode = self.ui.get_user_input()
         input_path = Path(input_str)
         
         # Validate path
@@ -105,10 +105,10 @@ class ConverterController:
         
         # Process files
         start_time = time.perf_counter()
-        accumulator = self._process_files(files, handler, merge_enabled)
+        accumulator = self._process_files(files, handler, merge_mode)
         
-        # Handle merge output
-        if merge_enabled and accumulator:
+        # Handle output based on merge mode
+        if merge_mode == "merge" and accumulator:
             self._save_merged_output(input_path, handler, accumulator)
         
         # Show completion
@@ -135,7 +135,7 @@ class ConverterController:
         self, 
         files: List[Path], 
         handler: OutputHandler, 
-        merge_enabled: bool
+        merge_mode: str
     ) -> List[str]:
         """
         Process all files with progress tracking.
@@ -143,10 +143,10 @@ class ConverterController:
         Args:
             files: List of files to process
             handler: Output format handler
-            merge_enabled: Whether to accumulate content for merging
+            merge_mode: One of "no_merge", "merge", or "per_page"
             
         Returns:
-            List of accumulated content (empty if merge disabled)
+            List of accumulated content (empty unless merge_mode == "merge")
         """
         accumulator = []
         
@@ -168,10 +168,10 @@ class ConverterController:
                     tasks[file], 
                     progress, 
                     handler, 
-                    merge_enabled
+                    merge_mode
                 )
                 
-                if content and merge_enabled:
+                if content and merge_mode == "merge":
                     accumulator.append(
                         f"\n--- start source: {file.name} ---\n{content}"
                     )
@@ -184,7 +184,7 @@ class ConverterController:
         task_id: int, 
         progress, 
         handler: OutputHandler, 
-        merge_enabled: bool
+        merge_mode: str
     ) -> Optional[str]:
         """
         Process a single file with progress tracking.
@@ -194,10 +194,10 @@ class ConverterController:
             task_id: Progress bar task ID
             progress: Progress bar instance
             handler: Output format handler
-            merge_enabled: Whether to return content for merging
+            merge_mode: One of "no_merge", "merge", or "per_page"
             
         Returns:
-            Extracted content if merge enabled, None otherwise
+            Extracted content if merge_mode == "merge", None otherwise
         """
         file_start = time.perf_counter()
         
@@ -229,12 +229,21 @@ class ConverterController:
             except Exception:
                 pass
         
-        # Extract content
-        content = converter.extract_content(progress_callback=progress_callback)
-        
-        # Save individual file if not merging
-        if not merge_enabled:
-            handler.save(content, file)
+        # Extract and save based on merge mode
+        if merge_mode == "per_page":
+            # Per-page output: extract and save individual pages as separate files
+            contents = converter.extract_content_per_item(progress_callback=progress_callback)
+            handler.save_multiple(contents, file, file.name)
+            content = None  # No content to accumulate for merge
+        else:
+            # Extract content as single string
+            content = converter.extract_content(progress_callback=progress_callback)
+            
+            # Save based on merge mode
+            if merge_mode == "no_merge":
+                # Save as single file (existing behavior)
+                handler.save(content, file)
+            # If merge_mode == "merge", don't save now, will be merged later
         
         # Mark as complete
         file_elapsed = time.perf_counter() - file_start

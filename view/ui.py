@@ -176,13 +176,15 @@ class RetroCLI(UIInterface):
             table.add_column("file", style=self.colors["border"])
 
             for i, file in enumerate(files):
-                checkbox = f"[{self.colors['options']}]✔[/]" if file in selected_files else f"[{self.colors['options']}]❏[/]"
+                checkbox = "✔" if file in selected_files else "❏"
                 marker = f"[{self.colors['options']}]►[/]" if i == current_index else " "
                 if i == current_index:
+                    checkbox_colored = f"[{self.colors['options']}]{checkbox}[/]"
                     filename_text = f"[{self.colors['options']}]" + file.name + "[/]"
                 else:
-                    filename_text = file.name
-                table.add_row(f"{marker} {checkbox} {filename_text}")
+                    checkbox_colored = checkbox
+                    filename_text = f"[{self.colors['prompt']}]" + file.name + "[/]"
+                table.add_row(f"{marker} {checkbox_colored} {filename_text}")
 
             self.print_center(
                 Panel(
@@ -259,33 +261,79 @@ class RetroCLI(UIInterface):
                 )
             )
 
-        merge_prompt = Panel(
-            f"[{self.colors['prompt']}]merge batch into single file [{self.colors['options']}](y/[bold]N[/])[/]?",
-            border_style=self.colors["border"],
-            width=min(self.max_width, self.console.size.width),
-        )
-        self.print_center(merge_prompt)
+        # Merge mode selection menu
+        merge_choice = self._select_merge_mode()
+
+        return path_str, format_choice, merge_choice
+
+    def _select_merge_mode(self) -> str:
+        """
+        Interactive merge mode selection menu with radio button options.
+        
+        Returns:
+            One of: "no_merge", "merge", "per_page"
+        """
+        options = [
+            ("no_merge", "no merge", "(separate file per document)"),
+            ("merge", "merge", "(combine all into single file)"),
+            ("per_page", "file per page", "(one file per page/chapter)"),
+        ]
+        current_index = 0  # Default to "no_merge"
+        
         while True:
-            resp = self.input_center()
-            if not resp:
-                merge_choice = False
-                break
-            r = resp.strip().lower()
-            if r in ("y", "yes"):
-                merge_choice = True
-                break
-            if r in ("n", "no"):
-                merge_choice = False
-                break
+            self.console.clear()
+            self.draw_header()
+
+            panel_width = min(self.max_width, self.console.size.width)
+            table_width = panel_width - 4
+
+            table = Table(
+                title=f"[{self.colors['prompt']}]select merge mode[/]",
+                show_header=False,
+                width=table_width,
+                border_style=self.colors["border"],
+            )
+            table.add_column("option", style=self.colors["border"])
+
+            for i, (key, name, hint) in enumerate(options):
+                # Radio button: filled if selected, empty if not
+                if i == current_index:
+                    radio = f"[{self.colors['options']}]●[/]"
+                    option_text = f"[{self.colors['options']}]{name}[/] [{self.colors['options']}]{hint}[/]"
+                else:
+                    radio = "○"
+                    option_text = f"[{self.colors['prompt']}]{name}[/] {hint}"
+                marker = f"[{self.colors['options']}]►[/]" if i == current_index else " "
+                table.add_row(f"{marker} {radio} {option_text}")
+
             self.print_center(
                 Panel(
-                    f"[{self.colors['error']}]please answer y or n[/]",
+                    table,
                     border_style=self.colors["border"],
-                    width=min(self.max_width, self.console.size.width),
+                    width=panel_width,
+                )
+            )
+            self.print_center(
+                Panel(
+                    f"[{self.colors['prompt']}][{self.colors['options']}]⬆︎ /⬇︎[/] :navigate  [{self.colors['options']}][ENTER][/]:confirm[/]",
+                    border_style=self.colors["border"],
+                    width=panel_width,
                 )
             )
 
-        return path_str, format_choice, merge_choice
+            key = readchar.readchar()
+
+            if key == "\x1b":
+                next1 = readchar.readchar()
+                next2 = readchar.readchar()
+                if next1 == "[":
+                    if next2 == "A":
+                        current_index = (current_index - 1) % len(options)
+                    elif next2 == "B":
+                        current_index = (current_index + 1) % len(options)
+            elif key in ("\r", "\n"):
+                # Enter confirms the current selection
+                return options[current_index][0]
 
     def get_progress_bar(self):
         @contextmanager
