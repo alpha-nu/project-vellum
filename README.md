@@ -7,16 +7,14 @@
       ╚═══╝  ╚══════╝╚══════╝╚══════╝ ╚═════╝ ╚═╝     ╚═╝
 ```
 
-# THE DOCUMENT CONVERTER
-
 [![Tests](https://github.com/alpha-nu/project-vellum/actions/workflows/test.yml/badge.svg)](https://github.com/alpha-nu/project-vellum/actions/workflows/test.yml)
 [![Coverage](https://alpha-nu.github.io/project-vellum/badge.svg?t=latest)](https://alpha-nu.github.io/project-vellum/)
 
-Vellum is a high-performance, object-oriented document extraction engine designed with a retro-terminal aesthetic. It transforms PDFs (including scanned images via OCR) and ePubs into clean, structured data.
+**VELLUM** is a high-performance, object-oriented document extraction engine designed with a retro-terminal aesthetic. It transforms PDFs (including scanned images via OCR) and ePubs into clean, structured data.
 
 Vellum is optimized for **Python 3.13**
 
-## 🛠 Features
+## Features
 * **Dual-Engine Parsing:** Uses `PyMuPDF` for digital text and `Tesseract OCR` for scanned/image-based PDFs.
 * **ePub Scrubbing:** Deep-cleans ebook containers, stripping HTML/CSS while preserving narrative flow.
 * **Batch Processing:** Interactive file selector for directories - navigate and select files with keyboard controls.
@@ -29,7 +27,7 @@ Vellum is optimized for **Python 3.13**
 
 ---
 
-## 🚀 Quick Start (Docker)
+## Quick Start (Docker)
 
 Docker is the recommended way to run Vellum, as it packages the Tesseract OCR engine and all language training data.
 
@@ -46,7 +44,7 @@ Docker is the recommended way to run Vellum, as it packages the Tesseract OCR en
 
 ---
 
-## 📖 CLI Workflow
+## CLI Workflow
 
 Once launched, Vellum's interactive interface guides you through the conversion:
 
@@ -71,7 +69,7 @@ Once launched, Vellum's interactive interface guides you through the conversion:
 
 ---
 
-## 💻 Local Development
+## Local Development
 
 If you prefer to run the code natively:
 
@@ -92,7 +90,7 @@ python main.py
 
 ---
 
-## 🧪 Testing
+## Testing
 
 Vellum follows **MVC architecture** with comprehensive unit test coverage (98%+) and automated testing on every commit.
 
@@ -156,10 +154,10 @@ start htmlcov/index.html         # Windows
 ### CI/CD Integration
 
 GitHub Actions automatically:
-- ✅ Runs full test suite on every commit to `main`
-- ✅ Generates coverage reports
-- ✅ Publishes coverage to GitHub Pages: [View Coverage](https://alpha-nu.github.io/project-vellum/)
-- ✅ Updates coverage badge in README
+- Runs full test suite on every commit to `main`
+- Generates coverage reports
+- Publishes coverage to GitHub Pages: [View Coverage](https://alpha-nu.github.io/project-vellum/)
+- Updates coverage badge in README
 
 **Workflow file:** `.github/workflows/test.yml`
 
@@ -172,7 +170,7 @@ Configured via `pytest.ini` and `.coveragerc`:
 
 ---
 
-## 🏗 Architecture
+## Architecture
 
 Vellum implements **Model-View-Controller (MVC)** with strict separation of concerns:
 
@@ -222,6 +220,6 @@ vellum/
 
 ---
 
-## 📄 License
+## License
 
 [View License](LICENSE)
