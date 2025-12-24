@@ -305,6 +305,12 @@ class TestDisplayMethods:
 class TestInteractiveSelection:
     """Test interactive file selection"""
     
+    @staticmethod
+    def _paths_to_file_data(paths):
+        """Convert Path objects to file data dicts for view."""
+        from model.file import File
+        return [File(p).to_dict() for p in paths]
+    
     @patch('view.ui.readchar.readchar')
     def test_select_files_enter_immediately(self, mock_readchar, tmp_path):
         """Test selecting files by pressing enter immediately (no selection)"""
@@ -318,7 +324,8 @@ class TestInteractiveSelection:
         console = Console(record=True)
         ui = RetroCLI(console=console)
         
-        selected = ui.select_files(files)
+        file_data = self._paths_to_file_data(files)
+        selected = ui.select_files(file_data)
         
         assert selected == []
     
@@ -335,10 +342,11 @@ class TestInteractiveSelection:
         console = Console(record=True)
         ui = RetroCLI(console=console)
         
-        selected = ui.select_files(files)
+        file_data = self._paths_to_file_data(files)
+        selected = ui.select_files(file_data)
         
         assert len(selected) == 1
-        assert selected[0] == files[0]
+        assert selected[0] == 0  # First file index
     
     @patch('view.ui.readchar.readchar')
     def test_select_files_down_arrow(self, mock_readchar, tmp_path):
@@ -357,11 +365,12 @@ class TestInteractiveSelection:
         console = Console(record=True)
         ui = RetroCLI(console=console)
         
-        selected = ui.select_files(files)
+        file_data = self._paths_to_file_data(files)
+        selected = ui.select_files(file_data)
         
         # Should select second file (index 1)
         assert len(selected) == 1
-        assert selected[0] == files[1]
+        assert selected[0] == 1
     
     @patch('view.ui.readchar.readchar')
     def test_select_files_up_arrow(self, mock_readchar, tmp_path):
@@ -380,11 +389,12 @@ class TestInteractiveSelection:
         console = Console(record=True)
         ui = RetroCLI(console=console)
         
-        selected = ui.select_files(files)
+        file_data = self._paths_to_file_data(files)
+        selected = ui.select_files(file_data)
         
         # Should wrap to last file
         assert len(selected) == 1
-        assert selected[0] == files[2]
+        assert selected[0] == 2  # Last file index
     
     @patch('view.ui.readchar.readchar')
     def test_select_files_toggle_on_off(self, mock_readchar, tmp_path):
@@ -398,7 +408,8 @@ class TestInteractiveSelection:
         console = Console(record=True)
         ui = RetroCLI(console=console)
         
-        selected = ui.select_files(files)
+        file_data = self._paths_to_file_data(files)
+        selected = ui.select_files(file_data)
         
         # Should be deselected
         assert selected == []
@@ -416,10 +427,11 @@ class TestInteractiveSelection:
         console = Console(record=True)
         ui = RetroCLI(console=console)
         
-        selected = ui.select_files(files)
+        file_data = self._paths_to_file_data(files)
+        selected = ui.select_files(file_data)
         
         assert len(selected) == 3
-        assert all(f in selected for f in files)
+        assert selected == [0, 1, 2]  # All indices
     
     @patch('view.ui.readchar.readchar')
     def test_select_files_quit(self, mock_readchar, tmp_path):
@@ -433,10 +445,11 @@ class TestInteractiveSelection:
         console = Console(record=True)
         ui = RetroCLI(console=console)
         
+        file_data = self._paths_to_file_data(files)
         # Should raise SystemExit
         import pytest
         with pytest.raises(SystemExit) as exc_info:
-            ui.select_files(files)
+            ui.select_files(file_data)
         
         assert exc_info.value.code == 0
     
@@ -453,7 +466,8 @@ class TestInteractiveSelection:
         console = Console(record=True)
         ui = RetroCLI(console=console)
         
-        selected = ui.select_files(files)
+        file_data = self._paths_to_file_data(files)
+        selected = ui.select_files(file_data)
         
         # Should be empty after toggle
         assert len(selected) == 0
@@ -471,12 +485,15 @@ class TestInteractiveSelection:
         console = Console(record=True)
         ui = RetroCLI(console=console)
         
-        selected = ui.select_files(files)
+        file_data = self._paths_to_file_data(files)
         
-        # Should have 2 files (all 3 selected, then first deselected)
+        selected = ui.select_files(file_data)
+        
+        # Should have 2 files (all 3 selected, then current deselected)
         assert len(selected) == 2
-        assert files[1] in selected
-        assert files[2] in selected
+        assert 0 not in selected  # Current (first) was deselected
+        assert 1 in selected
+        assert 2 in selected
 
 
 class TestUserInput:

@@ -23,8 +23,9 @@ class FakeUI:
         # return path_str, format_choice(1=plain), merge_mode("no_merge")
         return str(self._tmp), 1, "no_merge"
 
-    def select_files(self, files):
-        return files
+    def select_files(self, file_data):
+        # Return all indices (select all files)
+        return list(range(len(file_data)))
 
     def get_progress_bar(self):
         class FakeProgress:
@@ -137,9 +138,9 @@ def test_controller_directory_mode(tmp_path, monkeypatch):
         def get_user_input(self):
             return str(self._tmp), 1, False
         
-        def select_files(self, files):
-            self.selected = files
-            return files  # Select all
+        def select_files(self, file_data):
+            self.selected = file_data
+            return list(range(len(file_data)))  # Select all
     
     monkeypatch.setattr(
         "controller.converter_controller.ConverterController.get_converter",
@@ -152,8 +153,8 @@ def test_controller_directory_mode(tmp_path, monkeypatch):
     
     # Should have found only .pdf and .epub files
     assert len(ui.selected) == 2
-    assert any(f.name == "file1.pdf" for f in ui.selected)
-    assert any(f.name == "file2.epub" for f in ui.selected)
+    assert any(f['name'] == "file1.pdf" for f in ui.selected)
+    assert any(f['name'] == "file2.epub" for f in ui.selected)
 
 
 def test_controller_merge_mode(tmp_path, monkeypatch):
@@ -171,8 +172,8 @@ def test_controller_merge_mode(tmp_path, monkeypatch):
         def get_user_input(self):
             return str(self._tmp), 1, "merge"  # Enable merge
         
-        def select_files(self, files):
-            return files
+        def select_files(self, file_data):
+            return list(range(len(file_data)))
         
         def show_merge_complete(self, output_name):
             self.merge_complete_called = True
@@ -209,7 +210,7 @@ def test_controller_no_compatible_files(tmp_path):
         def get_user_input(self):
             return str(self._tmp), 1, False
         
-        def select_files(self, files):
+        def select_files(self, file_data):
             return []  # User selects nothing
         
         def show_no_files(self):
@@ -477,8 +478,8 @@ class TestControllerPerPageMode:
             def get_user_input(self):
                 return str(test_file), 1, "per_page"
             
-            def select_files(self, files):
-                return files
+            def select_files(self, file_data):
+                return list(range(len(file_data)))
             
             def get_progress_bar(self):
                 from contextlib import contextmanager
@@ -558,8 +559,8 @@ class TestControllerPerPageMode:
             def get_user_input(self):
                 return str(test_file), 1, "no_merge"
             
-            def select_files(self, files):
-                return files
+            def select_files(self, file_data):
+                return list(range(len(file_data)))
             
             def get_progress_bar(self):
                 from contextlib import contextmanager

@@ -13,6 +13,7 @@ import time
 from view.interface import UIInterface
 from model.converters import PDFConverter, EPubConverter
 from model.outputs import PlainTextHandler, MarkdownHandler, JSONHandler, OutputHandler
+from model.file import File
 
 
 class ConverterController:
@@ -130,7 +131,9 @@ class ConverterController:
         """
         if input_path.is_dir():
             compatible_files = self.get_compatible_files(input_path)
-            return self.ui.select_files(compatible_files)
+            file_data = [File(path).to_dict() for path in compatible_files]
+            selected_indices = self.ui.select_files(file_data)
+            return [compatible_files[i] for i in selected_indices]
         else:
             return [input_path]
     

@@ -163,8 +163,16 @@ class RetroCLI(UIInterface):
             )
         )
 
-    def select_files(self, files: list[Path]) -> list[Path]:
-        selected_files = []
+    def select_files(self, file_data: list[dict]) -> list[int]:
+        """Display file selector and return indices of selected files.
+        
+        Args:
+            file_data: List of dicts with 'name' and 'size' keys
+            
+        Returns:
+            List of selected file indices
+        """
+        selected_indices = []
         current_index = 0
         while True:
             self.console.clear()
@@ -181,16 +189,19 @@ class RetroCLI(UIInterface):
             )
             table.add_column("file", style=self.colors["subtle"])
 
-            for i, file in enumerate(files):
-                checkbox = "✔" if file in selected_files else "❏"
+            for i, file_info in enumerate(file_data):
+                checkbox = "✔" if i in selected_indices else "❏"
                 marker = f"[{self.colors['secondary']}]►[/]" if i == current_index else " "
+                
                 if i == current_index:
                     checkbox_colored = f"[{self.colors['secondary']}]{checkbox}[/]"
-                    filename_text = f"[{self.colors['secondary']}]" + file.name + "[/]"
+                    filename_text = f"[{self.colors['secondary']}]{file_info['name']}[/]"
+                    size_text = f"[{self.colors['secondary']}]({file_info['size']})[/]"
                 else:
                     checkbox_colored = checkbox
-                    filename_text = f"[{self.colors['primary']}]" + file.name + "[/]"
-                table.add_row(f"{marker} {checkbox_colored} {filename_text}")
+                    filename_text = f"[{self.colors['primary']}]{file_info['name']}[/]"
+                    size_text = f"[{self.colors['subtle']}]({file_info['size']})[/]"
+                table.add_row(f"{marker} {checkbox_colored} {filename_text} {size_text}")
 
             self.print_center(
                 Panel(
@@ -214,28 +225,27 @@ class RetroCLI(UIInterface):
                 next2 = readchar.readchar()
                 if next1 == "[":
                     if next2 == "A":
-                        current_index = (current_index - 1) % len(files)
+                        current_index = (current_index - 1) % len(file_data)
                     elif next2 == "B":
-                        current_index = (current_index + 1) % len(files)
+                        current_index = (current_index + 1) % len(file_data)
             elif key == " ":
-                file = files[current_index]
-                if file in selected_files:
-                    selected_files.remove(file)
+                if current_index in selected_indices:
+                    selected_indices.remove(current_index)
                 else:
-                    selected_files.append(file)
+                    selected_indices.append(current_index)
             elif key in ("\r", "\n"):
                 break
             elif key.lower() == "a":
                 # Toggle: if all are selected, deselect all; otherwise select all
-                if len(selected_files) == len(files):
-                    selected_files = []
+                if len(selected_indices) == len(file_data):
+                    selected_indices = []
                 else:
-                    selected_files = list(files)
+                    selected_indices = list(range(len(file_data)))
             elif key.lower() == "q":
                 import sys
                 sys.exit(0)
 
-        return selected_files
+        return selected_indices
 
     def get_user_input(self):
         self.console.clear()

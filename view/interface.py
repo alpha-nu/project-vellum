@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List
+from typing import List, Dict, Any
 from pathlib import Path
 
 
@@ -25,7 +25,15 @@ class UIInterface(ABC):
         pass
 
     @abstractmethod
-    def select_files(self, files: List[Path]) -> List[Path]:
+    def select_files(self, file_data: List[Dict[str, Any]]) -> List[int]:
+        """Display file selector and return indices of selected files.
+        
+        Args:
+            file_data: List of dicts with 'name' and 'size' keys
+            
+        Returns:
+            List of selected file indices
+        """
         pass
 
     @abstractmethod
