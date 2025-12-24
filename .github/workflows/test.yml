@@ -39,9 +39,8 @@ jobs:
       run: |
         COVERAGE=$(python -c "import xml.etree.ElementTree as ET; tree = ET.parse('coverage.xml'); root = tree.getroot(); print(round(float(root.attrib['line-rate']) * 100, 1))")
         echo "Coverage: ${COVERAGE}%"
-        mkdir -p badges
         COLOR=$([[ $(echo "$COVERAGE >= 90" | bc -l) -eq 1 ]] && echo "brightgreen" || ([[ $(echo "$COVERAGE >= 75" | bc -l) -eq 1 ]] && echo "yellow" || echo "red"))
-        curl "https://img.shields.io/badge/coverage-${COVERAGE}%25-${COLOR}" > badges/coverage.svg
+        curl "https://img.shields.io/badge/coverage-${COVERAGE}%25-${COLOR}" > htmlcov/badge.svg
     
     - name: Deploy coverage report to GitHub Pages
       if: github.ref == 'refs/heads/main'
