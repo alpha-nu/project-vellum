@@ -24,7 +24,7 @@ jobs:
     - name: Install system dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y tesseract-ocr tesseract-ocr-eng
+        sudo apt-get install -y tesseract-ocr tesseract-ocr-eng bc
     
     - name: Install Python dependencies
       run: |
@@ -34,6 +34,13 @@ jobs:
     - name: Run tests with coverage
       run: |
         python -m pytest tests/ -v --cov=. --cov-report=term --cov-report=html --cov-report=xml
+
+    - name: Verify coverage artifacts
+      run: |
+        echo "Listing htmlcov contents"
+        ls -la htmlcov || (echo "htmlcov directory not found" && exit 1)
+        test -f htmlcov/index.html || (echo "index.html not found in htmlcov" && exit 1)
+        test -f coverage.xml || (echo "coverage.xml not found" && exit 1)
     
     - name: Create coverage badge
       run: |
@@ -41,6 +48,7 @@ jobs:
         echo "Coverage: ${COVERAGE}%"
         COLOR=$([[ $(echo "$COVERAGE >= 90" | bc -l) -eq 1 ]] && echo "brightgreen" || ([[ $(echo "$COVERAGE >= 75" | bc -l) -eq 1 ]] && echo "yellow" || echo "red"))
         curl "https://img.shields.io/badge/coverage-${COVERAGE}%25-${COLOR}" > htmlcov/badge.svg
+        test -f htmlcov/badge.svg || (echo "badge.svg not created" && exit 1)
     
     - name: Deploy coverage report to GitHub Pages
       if: github.ref == 'refs/heads/main'
