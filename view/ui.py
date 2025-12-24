@@ -392,11 +392,8 @@ class RetroCLI(UIInterface):
         self.print_panel("no compatible files found", content_color_key="error")
 
     def show_merge_complete(self, output_name: str):
-        content = (
-            f"[{self.colors['confirm']}]merge complete[/]\n"
-            f"[{self.colors['confirm']}] {output_name} [/]")
         panel = Panel(
-            Align.center(Text.from_markup(content)),
+            Text.from_markup(f"[{self.colors['confirm']}]merge complete: {output_name}[/]"),
             border_style=self.colors["subtle"],
             width=min(self.max_width, self.console.size.width),
         )
