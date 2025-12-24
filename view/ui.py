@@ -195,7 +195,7 @@ class RetroCLI(UIInterface):
             )
             self.print_center(
                 Panel(
-                    f"[{self.colors['prompt']}][{self.colors["options"]}]⬆︎ /⬇︎[/] :navigate  [{self.colors["options"]}][SPACE][/]:toggle  [{self.colors["options"]}][ENTER][/]:confirm[/]",
+                    f"[{self.colors['prompt']}][{self.colors["options"]}]⬆︎ /⬇︎[/]:navigate  [{self.colors["options"]}][SPACE][/]:select  [{self.colors["options"]}][A][/]:all  [{self.colors["options"]}][Q][/]:quit  [{self.colors["options"]}][ENTER][/]:confirm[/]",
                     border_style=self.colors["border"],
                     width=panel_width,
                 )
@@ -220,10 +220,14 @@ class RetroCLI(UIInterface):
             elif key in ("\r", "\n"):
                 break
             elif key.lower() == "a":
-                selected_files = list(files)
-                break
+                # Toggle: if all are selected, deselect all; otherwise select all
+                if len(selected_files) == len(files):
+                    selected_files = []
+                else:
+                    selected_files = list(files)
             elif key.lower() == "q":
-                break
+                import sys
+                sys.exit(0)
 
         return selected_files
 

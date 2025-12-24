@@ -388,13 +388,13 @@ class TestInteractiveSelection:
     
     @patch('view.ui.readchar.readchar')
     def test_select_files_select_all(self, mock_readchar, tmp_path):
-        """Test selecting all with 'a' key"""
+        """Test selecting all with 'a' key - should select but not confirm"""
         files = [tmp_path / f"file{i}.pdf" for i in range(3)]
         for f in files:
             f.touch()
         
-        # Simulate: 'a' (select all)
-        mock_readchar.return_value = "a"
+        # Simulate: 'a' (select all), enter (confirm)
+        mock_readchar.side_effect = ["a", "\r"]
         
         console = Console(record=True)
         ui = RetroCLI(console=console)
@@ -406,7 +406,7 @@ class TestInteractiveSelection:
     
     @patch('view.ui.readchar.readchar')
     def test_select_files_quit(self, mock_readchar, tmp_path):
-        """Test quitting with 'q' key"""
+        """Test quitting with 'q' key exits application"""
         files = [tmp_path / "file.pdf"]
         files[0].touch()
         
@@ -416,9 +416,50 @@ class TestInteractiveSelection:
         console = Console(record=True)
         ui = RetroCLI(console=console)
         
+        # Should raise SystemExit
+        import pytest
+        with pytest.raises(SystemExit) as exc_info:
+            ui.select_files(files)
+        
+        assert exc_info.value.code == 0
+    
+    @patch('view.ui.readchar.readchar')
+    def test_select_files_all_toggle_deselect(self, mock_readchar, tmp_path):
+        """Test [A] pressed twice toggles: select all then deselect all"""
+        files = [tmp_path / f"file{i}.pdf" for i in range(3)]
+        for f in files:
+            f.touch()
+        
+        # Simulate: 'a' (select all), 'a' (deselect all), enter
+        mock_readchar.side_effect = ["a", "a", "\r"]
+        
+        console = Console(record=True)
+        ui = RetroCLI(console=console)
+        
         selected = ui.select_files(files)
         
-        assert selected == []
+        # Should be empty after toggle
+        assert len(selected) == 0
+    
+    @patch('view.ui.readchar.readchar')
+    def test_select_files_all_continues_loop(self, mock_readchar, tmp_path):
+        """Test [A] selects all but allows further navigation before confirm"""
+        files = [tmp_path / f"file{i}.pdf" for i in range(3)]
+        for f in files:
+            f.touch()
+        
+        # Simulate: 'a' (select all), space (deselect current), enter
+        mock_readchar.side_effect = ["a", " ", "\r"]
+        
+        console = Console(record=True)
+        ui = RetroCLI(console=console)
+        
+        selected = ui.select_files(files)
+        
+        # Should have 2 files (all 3 selected, then first deselected)
+        assert len(selected) == 2
+        assert files[1] in selected
+        assert files[2] in selected
 
 
 class TestUserInput:
