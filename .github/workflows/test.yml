@@ -12,6 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pages: write
+      id-token: write
     
     steps:
     - uses: actions/checkout@v4
@@ -49,10 +51,14 @@ jobs:
         COLOR=$([[ $(echo "$COVERAGE >= 90" | bc -l) -eq 1 ]] && echo "brightgreen" || ([[ $(echo "$COVERAGE >= 75" | bc -l) -eq 1 ]] && echo "yellow" || echo "red"))
         curl "https://img.shields.io/badge/coverage-${COVERAGE}%25-${COLOR}" > htmlcov/badge.svg
         test -f htmlcov/badge.svg || (echo "badge.svg not created" && exit 1)
-    
-    - name: Deploy coverage report to GitHub Pages
-      if: github.ref == 'refs/heads/main'
-      uses: peaceiris/actions-gh-pages@v4
+
+    - name: Upload Pages artifact (htmlcov)
+      uses: actions/upload-pages-artifact@v3
       with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./htmlcov
+        path: ./htmlcov
+
+    - name: Deploy to GitHub Pages
+      id: deploy
+      uses: actions/deploy-pages@v4
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
