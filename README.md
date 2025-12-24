@@ -1,5 +1,8 @@
 # 📟 VELLUM: THE DOCUMENT CONVERTER
 
+[![Tests](https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/test.yml/badge.svg)](https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/test.yml)
+[![Coverage](https://YOUR_USERNAME.github.io/YOUR_REPO/coverage/badge.svg)](https://YOUR_USERNAME.github.io/YOUR_REPO/coverage/)
+
 Vellum is a high-performance, object-oriented document extraction engine designed with a retro-terminal aesthetic. It transforms PDFs (including scanned images via OCR) and ePubs into clean, structured data.
 
 Vellum is optimized for **Python 3.13**

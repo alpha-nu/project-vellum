@@ -1,0 +1,49 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 3.13
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+    
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y tesseract-ocr tesseract-ocr-eng
+    
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Run tests with coverage
+      run: |
+        python -m pytest tests/ -v --cov=. --cov-report=term --cov-report=html --cov-report=xml
+    
+    - name: Create coverage badge
+      run: |
+        COVERAGE=$(python -c "import xml.etree.ElementTree as ET; tree = ET.parse('coverage.xml'); root = tree.getroot(); print(round(float(root.attrib['line-rate']) * 100, 1))")
+        echo "Coverage: ${COVERAGE}%"
+        mkdir -p badges
+        COLOR=$([[ $(echo "$COVERAGE >= 90" | bc -l) -eq 1 ]] && echo "brightgreen" || ([[ $(echo "$COVERAGE >= 75" | bc -l) -eq 1 ]] && echo "yellow" || echo "red"))
+        curl "https://img.shields.io/badge/coverage-${COVERAGE}%25-${COLOR}" > badges/coverage.svg
+    
+    - name: Deploy coverage report to GitHub Pages
+      if: github.ref == 'refs/heads/main'
+      uses: peaceiris/actions-gh-pages@v4
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./htmlcov
+        destination_dir: coverage
