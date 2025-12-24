@@ -23,9 +23,10 @@ class TestRetroCLIBasics:
         
         assert ui.max_width == 120
         assert ui.console is not None
-        assert "border" in ui.colors
-        assert "prompt" in ui.colors
-        assert "logo" in ui.colors
+        assert "subtle" in ui.colors
+        assert "primary" in ui.colors
+        assert "secondary" in ui.colors
+        assert "accented" in ui.colors
     
     def test_init_custom_console(self):
         """Test initialization with custom console"""
@@ -37,13 +38,13 @@ class TestRetroCLIBasics:
     
     def test_init_custom_colors(self):
         """Test initialization with custom colors"""
-        custom_colors = {"border": "#ff0000", "custom": "#00ff00"}
+        custom_colors = {"subtle": "#ff0000", "custom": "#00ff00"}
         ui = RetroCLI(colors=custom_colors)
         
-        assert ui.colors["border"] == "#ff0000"
+        assert ui.colors["subtle"] == "#ff0000"
         assert ui.colors["custom"] == "#00ff00"
         # Default colors should still exist
-        assert "prompt" in ui.colors
+        assert "primary" in ui.colors
     
     def test_print_center(self):
         """Test centered printing"""
@@ -60,7 +61,7 @@ class TestRetroCLIBasics:
         console = Console(record=True)
         ui = RetroCLI(console=console)
         
-        ui.print_panel("test message", content_color_key="prompt")
+        ui.print_panel("test message", content_color_key="primary")
         ui.print_panel("error message", content_color_key="error")
         
         text = console.export_text()
@@ -171,7 +172,7 @@ class TestProgressColumns:
     
     def test_styled_percentage_column_converting(self):
         """Test percentage column during conversion"""
-        colors = {"confirm": "green", "progress": "cyan"}
+        colors = {"confirm": "green", "accented": "cyan"}
         column = StyledPercentageColumn(colors)
         
         task = Mock()
@@ -183,7 +184,7 @@ class TestProgressColumns:
     
     def test_styled_percentage_column_done(self):
         """Test percentage column when done"""
-        colors = {"confirm": "green", "progress": "cyan"}
+        colors = {"confirm": "green", "accented": "cyan"}
         column = StyledPercentageColumn(colors)
         
         task = Mock()
@@ -195,7 +196,7 @@ class TestProgressColumns:
     
     def test_styled_description_column_pending(self):
         """Test description column with pending status"""
-        colors = {"confirm": "green", "progress": "cyan", "border": "grey"}
+        colors = {"confirm": "green", "accented": "cyan", "subtle": "grey"}
         column = StyledDescriptionColumn(colors)
         
         task = Mock()
@@ -206,7 +207,7 @@ class TestProgressColumns:
     
     def test_styled_description_column_converting(self):
         """Test description column during conversion"""
-        colors = {"confirm": "green", "progress": "cyan", "border": "grey"}
+        colors = {"confirm": "green", "accented": "cyan", "subtle": "grey"}
         column = StyledDescriptionColumn(colors)
         
         task = Mock()
@@ -218,7 +219,7 @@ class TestProgressColumns:
     
     def test_styled_description_column_done(self):
         """Test description column when done"""
-        colors = {"confirm": "green", "progress": "cyan", "border": "grey"}
+        colors = {"confirm": "green", "accented": "cyan", "subtle": "grey"}
         column = StyledDescriptionColumn(colors)
         
         task = Mock()

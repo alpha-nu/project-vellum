@@ -7,9 +7,9 @@ class FakeUI:
     def __init__(self, tmp_file: Path):
         self._tmp = tmp_file
         self.colors = {
-            "prompt": "white",
-            "progress": "cyan",
-            "options": "cyan",
+            "primary": "white",
+            "accented": "cyan",
+            "secondary": "cyan",
             "confirm": "green",
         }
 

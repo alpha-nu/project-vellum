@@ -78,7 +78,7 @@ class StyledPercentageColumn(TextColumn):
         if status == "done":
             return Text.from_markup(f"[{self.colors['confirm']}]{percentage}[/]")
         else:
-            return Text.from_markup(f"[{self.colors['progress']}]{percentage}[/]")
+            return Text.from_markup(f"[{self.colors['accented']}]{percentage}[/]")
 
 
 class StyledDescriptionColumn(TextColumn):
@@ -92,26 +92,27 @@ class StyledDescriptionColumn(TextColumn):
         filename = fields.get("filename", "")
 
         if status == "converting":
-            return Text.from_markup(f"[italic {self.colors['progress']}]converting {filename}[/]")
+            return Text.from_markup(f"[italic {self.colors['accented']}]converting {filename}[/]")
         elif status == "done":
             return Text.from_markup(f"[{self.colors['confirm']}]✓ {filename}[/]")
         else:
-            return Text.from_markup(f"[{self.colors['border']}]{filename}[/]")
+            return Text.from_markup(f"[{self.colors['subtle']}]{filename}[/]")
 
 
 class RetroCLI(UIInterface):
     def __init__(self, console: Optional[Console] = None, max_width: int = 120, colors: Optional[dict] = None):
         self.max_width = max_width
         self.console = console or Console()
-        # color scheme (hex values for consistency)
+        # Color scheme: primary (purple) for main text, subtle (grey) for borders,
+        # secondary (cyan) for interactive elements, accented (gold) for progress
         default_colors = {
-            "border": "#9aa0a6",  # soft grey for borders
-            "prompt": "#e9d8ff",  # softest purple for prompts
-            "logo": "#c25a1a",  # lavender for logo
-            "error": "#ff6b81",  # rosy for errors
-            "confirm": "#52d9d8",  # green for confirmations
-            "progress": "#c9a961",  # soft blue for progress indicators,
-            "options": "#7dd9d8", # soft cyan for output options
+            "subtle": "#9aa0a6",     # Soft grey for borders and subtle UI elements
+            "primary": "#e9d8ff",    # Soft purple for primary text and prompts
+            "logo": "#c25a1a",       # Orange/rust for the ASCII logo
+            "error": "#ff6b81",      # Rosy red for error messages
+            "confirm": "#52d9d8",    # Teal for confirmations and success
+            "accented": "#c9a961",   # Gold for progress indicators and emphasis
+            "secondary": "#7dd9d8",  # Cyan for interactive options and highlights
         }
         self.colors = {**default_colors, **(colors or {})}
 
@@ -126,7 +127,7 @@ class RetroCLI(UIInterface):
 
         left_padding = (term_width - panel_width) // 2
         prompt_str = " " * left_padding + prompt_symbol
-        markup = f"[{self.colors['prompt']}]" + prompt_str + "[/]"
+        markup = f"[{self.colors['primary']}]" + prompt_str + "[/]"
         return self.console.input(markup, markup=True)
 
     def clear_and_show_header(self):
@@ -154,10 +155,10 @@ class RetroCLI(UIInterface):
                 Align.center(
                     Text(ascii_logo, style=self.colors["logo"]) + Text(
                         "\n" + " " * padding + subtitle.lower(),
-                        style=f"{self.colors['prompt']}",
+                        style=f"{self.colors['primary']}",
                     )
                 ),
-                border_style=self.colors["border"],
+                border_style=self.colors["subtle"],
                 width=min(self.max_width, self.console.size.width),
             )
         )
@@ -173,35 +174,35 @@ class RetroCLI(UIInterface):
             table_width = panel_width - 4
 
             table = Table(
-                title=f"[{self.colors['prompt']}]select files for conversion[/]",
+                title=f"[{self.colors['primary']}]select files for conversion[/]",
                 show_header=False,
                 width=table_width,
-                border_style=self.colors["border"],
+                border_style=self.colors["subtle"],
             )
-            table.add_column("file", style=self.colors["border"])
+            table.add_column("file", style=self.colors["subtle"])
 
             for i, file in enumerate(files):
                 checkbox = "✔" if file in selected_files else "❏"
-                marker = f"[{self.colors['options']}]►[/]" if i == current_index else " "
+                marker = f"[{self.colors['secondary']}]►[/]" if i == current_index else " "
                 if i == current_index:
-                    checkbox_colored = f"[{self.colors['options']}]{checkbox}[/]"
-                    filename_text = f"[{self.colors['options']}]" + file.name + "[/]"
+                    checkbox_colored = f"[{self.colors['secondary']}]{checkbox}[/]"
+                    filename_text = f"[{self.colors['secondary']}]" + file.name + "[/]"
                 else:
                     checkbox_colored = checkbox
-                    filename_text = f"[{self.colors['prompt']}]" + file.name + "[/]"
+                    filename_text = f"[{self.colors['primary']}]" + file.name + "[/]"
                 table.add_row(f"{marker} {checkbox_colored} {filename_text}")
 
             self.print_center(
                 Panel(
                     table,
-                    border_style=self.colors["border"],
+                    border_style=self.colors["subtle"],
                     width=panel_width,
                 )
             )
             self.print_center(
                 Panel(
-                    f"[{self.colors['prompt']}][{self.colors["options"]}]⬆︎ /⬇︎[/] :navigate  [{self.colors["options"]}][SPACE][/]:select  [{self.colors["options"]}][A][/]:all  [{self.colors["options"]}][Q][/]:quit  [{self.colors["options"]}][ENTER][/]:confirm[/]",
-                    border_style=self.colors["border"],
+                    f"[{self.colors['primary']}][{self.colors["secondary"]}]⬆︎ /⬇︎[/] :navigate  [{self.colors["secondary"]}][SPACE][/]:select  [{self.colors["secondary"]}][A][/]:all  [{self.colors["secondary"]}][Q][/]:quit  [{self.colors["secondary"]}][ENTER][/]:confirm[/]",
+                    border_style=self.colors["subtle"],
                     width=panel_width,
                 )
             )
@@ -241,19 +242,19 @@ class RetroCLI(UIInterface):
         self.draw_header()
 
         path_prompt = Panel(
-            f"[{self.colors['prompt']}]provide a file or directory path[/] [{self.colors['options']}](e.g. source.pdf or /data)[/]",
-            border_style=self.colors["border"],
+            f"[{self.colors['primary']}]provide a file or directory path[/] [{self.colors['secondary']}](e.g. source.pdf or /data)[/]",
+            border_style=self.colors["subtle"],
             width=min(self.max_width, self.console.size.width),
         )
         self.print_center(path_prompt)
         path_str = self.input_center()
 
         format_prompt = Panel(
-            (f"[{self.colors['prompt']}]select output format[/]\n\n"
-             f"[{self.colors['border']}][1][/] [{self.colors["options"]}]plain text[/]\n"
-             f"[{self.colors['border']}][2][/] [{self.colors["options"]}]markdown[/]\n"
-             f"[{self.colors['border']}][3][/] [{self.colors["options"]}]json[/]"),
-            border_style=self.colors["border"],
+            (f"[{self.colors['primary']}]select output format[/]\n\n"
+             f"[{self.colors['subtle']}][1][/] [{self.colors["secondary"]}]plain text[/]\n"
+             f"[{self.colors['subtle']}][2][/] [{self.colors["secondary"]}]markdown[/]\n"
+             f"[{self.colors['subtle']}][3][/] [{self.colors["secondary"]}]json[/]"),
+            border_style=self.colors["subtle"],
             width=min(self.max_width, self.console.size.width),
         )
         self.print_center(format_prompt)
@@ -265,7 +266,7 @@ class RetroCLI(UIInterface):
             self.print_center(
                 Panel(
                     f"[{self.colors['error']}]please enter 1, 2, or 3[/]",
-                    border_style=self.colors["border"],
+                    border_style=self.colors["subtle"],
                     width=min(self.max_width, self.console.size.width),
                 )
             )
@@ -297,35 +298,35 @@ class RetroCLI(UIInterface):
             table_width = panel_width - 4
 
             table = Table(
-                title=f"[{self.colors['prompt']}]select merge mode[/]",
+                title=f"[{self.colors['primary']}]select merge mode[/]",
                 show_header=False,
                 width=table_width,
-                border_style=self.colors["border"],
+                border_style=self.colors["subtle"],
             )
-            table.add_column("option", style=self.colors["border"])
+            table.add_column("option", style=self.colors["subtle"])
 
             for i, (key, name, hint) in enumerate(options):
                 # Radio button: filled if selected, empty if not
                 if i == current_index:
-                    radio = f"[{self.colors['options']}]●[/]"
-                    option_text = f"[{self.colors['options']}]{name}[/] [{self.colors['options']}]{hint}[/]"
+                    radio = f"[{self.colors['secondary']}]●[/]"
+                    option_text = f"[{self.colors['secondary']}]{name}[/] [{self.colors['secondary']}]{hint}[/]"
                 else:
                     radio = "○"
-                    option_text = f"[{self.colors['prompt']}]{name}[/] {hint}"
-                marker = f"[{self.colors['options']}]►[/]" if i == current_index else " "
+                    option_text = f"[{self.colors['primary']}]{name}[/] {hint}"
+                marker = f"[{self.colors['secondary']}]►[/]" if i == current_index else " "
                 table.add_row(f"{marker} {radio} {option_text}")
 
             self.print_center(
                 Panel(
                     table,
-                    border_style=self.colors["border"],
+                    border_style=self.colors["subtle"],
                     width=panel_width,
                 )
             )
             self.print_center(
                 Panel(
-                    f"[{self.colors['prompt']}][{self.colors['options']}]⬆︎ /⬇︎[/] :navigate  [{self.colors['options']}][ENTER][/]:confirm[/]",
-                    border_style=self.colors["border"],
+                    f"[{self.colors['primary']}][{self.colors['secondary']}]⬆︎ /⬇︎[/] :navigate  [{self.colors['secondary']}][ENTER][/]:confirm[/]",
+                    border_style=self.colors["subtle"],
                     width=panel_width,
                 )
             )
@@ -351,19 +352,19 @@ class RetroCLI(UIInterface):
                 StyledDescriptionColumn(self.colors),
                 BarColumn(
                     bar_width=None,
-                    style=self.colors["border"],
-                    complete_style=self.colors["progress"],
-                    finished_style=self.colors["border"],
+                    style=self.colors["subtle"],
+                    complete_style=self.colors["accented"],
+                    finished_style=self.colors["subtle"],
                 ),
                 StyledPercentageColumn(self.colors),
-                StyledTimeElapsedColumn(self.colors["progress"]),
+                StyledTimeElapsedColumn(self.colors["accented"]),
                 console=self.console,
                 transient=True,
             )
 
             panel = Panel(
                 progress,
-                border_style=self.colors["border"],
+                border_style=self.colors["subtle"],
                 width=min(self.max_width, self.console.size.width),
             )
             term_width = self.console.size.width
@@ -376,10 +377,10 @@ class RetroCLI(UIInterface):
 
         return _progress_ctx()
 
-    def print_panel(self, content: str, content_color_key: str = "prompt"):
+    def print_panel(self, content: str, content_color_key: str = "primary"):
         panel = Panel(
             f"[{self.colors[content_color_key]}]{content}[/]",
-            border_style=self.colors["border"],
+            border_style=self.colors["subtle"],
             width=min(self.max_width, self.console.size.width),
         )
         self.print_center(panel)
@@ -396,7 +397,7 @@ class RetroCLI(UIInterface):
             f"[{self.colors['confirm']}] {output_name} [/]")
         panel = Panel(
             Align.center(Text.from_markup(content)),
-            border_style=self.colors["border"],
+            border_style=self.colors["subtle"],
             width=min(self.max_width, self.console.size.width),
         )
         self.print_center(panel)
@@ -404,10 +405,10 @@ class RetroCLI(UIInterface):
     def show_shutdown(self, elapsed_seconds: float):
         content = (
             f"[{self.colors['confirm']}]conversion complete[/]\n"
-            f"[{self.colors['progress']}]run time: {elapsed_seconds:.2f}s[/]")
+            f"[{self.colors['accented']}]run time: {elapsed_seconds:.2f}s[/]")
         panel = Panel(
             Text.from_markup(content),
-            border_style=self.colors["border"],
+            border_style=self.colors["subtle"],
             width=min(self.max_width, self.console.size.width),
         )
         self.print_center(panel)
