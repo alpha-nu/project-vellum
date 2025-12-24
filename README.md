@@ -10,7 +10,7 @@
 # THE DOCUMENT CONVERTER
 
 [![Tests](https://github.com/alpha-nu/project-vellum/actions/workflows/test.yml/badge.svg)](https://github.com/alpha-nu/project-vellum/actions/workflows/test.yml)
-[![Coverage](https://alpha-nu.github.io/project-vellum/coverage/badge.svg?t=latest)](https://alpha-nu.github.io/project-vellum/coverage/)
+[![Coverage](https://alpha-nu.github.io/project-vellum/badge.svg?t=latest)](https://alpha-nu.github.io/project-vellum/)
 
 Vellum is a high-performance, object-oriented document extraction engine designed with a retro-terminal aesthetic. It transforms PDFs (including scanned images via OCR) and ePubs into clean, structured data.
 
@@ -158,7 +158,7 @@ start htmlcov/index.html         # Windows
 GitHub Actions automatically:
 - ✅ Runs full test suite on every commit to `main`
 - ✅ Generates coverage reports
-- ✅ Publishes coverage to GitHub Pages: [View Coverage](https://alpha-nu.github.io/project-vellum/coverage/)
+- ✅ Publishes coverage to GitHub Pages: [View Coverage](https://alpha-nu.github.io/project-vellum/)
 - ✅ Updates coverage badge in README
 
 **Workflow file:** `.github/workflows/test.yml`
