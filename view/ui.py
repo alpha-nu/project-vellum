@@ -129,6 +129,11 @@ class RetroCLI(UIInterface):
         markup = f"[{self.colors['prompt']}]" + prompt_str + "[/]"
         return self.console.input(markup, markup=True)
 
+    def clear_and_show_header(self):
+        """Clear screen and display header - used after file selection to show clean progress view"""
+        self.console.clear()
+        self.draw_header()
+
     def draw_header(self):
         self.VERSION = "[ epub | pdf -> txt: converter ] v.1.0.0"
         ascii_logo = """
@@ -195,7 +200,7 @@ class RetroCLI(UIInterface):
             )
             self.print_center(
                 Panel(
-                    f"[{self.colors['prompt']}][{self.colors["options"]}]⬆︎ /⬇︎[/]:navigate  [{self.colors["options"]}][SPACE][/]:select  [{self.colors["options"]}][A][/]:all  [{self.colors["options"]}][Q][/]:quit  [{self.colors["options"]}][ENTER][/]:confirm[/]",
+                    f"[{self.colors['prompt']}][{self.colors["options"]}]⬆︎ /⬇︎[/] :navigate  [{self.colors["options"]}][SPACE][/]:select  [{self.colors["options"]}][A][/]:all  [{self.colors["options"]}][Q][/]:quit  [{self.colors["options"]}][ENTER][/]:confirm[/]",
                     border_style=self.colors["border"],
                     width=panel_width,
                 )

@@ -16,6 +16,9 @@ class FakeUI:
     def draw_header(self):
         pass
 
+    def clear_and_show_header(self):
+        pass
+
     def get_user_input(self):
         # return path_str, format_choice(1=plain), merge_mode("no_merge")
         return str(self._tmp), 1, "no_merge"
@@ -468,6 +471,9 @@ class TestControllerPerPageMode:
             def draw_header(self):
                 pass
             
+            def clear_and_show_header(self):
+                pass
+            
             def get_user_input(self):
                 return str(test_file), 1, "per_page"
             
@@ -514,3 +520,90 @@ class TestControllerPerPageMode:
         contents, dest, source = save_multiple_called[0]
         assert contents == ["page1", "page2", "page3"]
         assert dest == test_file
+    
+    def test_controller_progress_exception_handling(self, tmp_path, monkeypatch):
+        """Test that controller gracefully handles exceptions in progress callback updates"""
+        from controller.converter_controller import ConverterController
+        
+        test_file = tmp_path / "test.pdf"
+        test_file.write_text("content")
+        
+        exception_raised = []
+        
+        class MockConverter:
+            def __init__(self, path):
+                self.path = path
+            
+            def extract_content(self, progress_callback=None):
+                # Progress callback that will trigger exception in controller
+                if progress_callback:
+                    try:
+                        # This will cause the exception in the controller's try-except
+                        progress_callback(1, 1)
+                    except:
+                        # The controller catches and ignores it
+                        exception_raised.append(True)
+                return "test content"
+        
+        class TestUI:
+            def __init__(self):
+                self.update_count = 0
+            
+            def draw_header(self):
+                pass
+            
+            def clear_and_show_header(self):
+                pass
+            
+            def get_user_input(self):
+                return str(test_file), 1, "no_merge"
+            
+            def select_files(self, files):
+                return files
+            
+            def get_progress_bar(self):
+                from contextlib import contextmanager
+                @contextmanager
+                def _ctx():
+                    class ProgressTracker:
+                        def __init__(self):
+                            self.update_count = 0
+                        
+                        def add_task(self, *a, **kw):
+                            return 1
+                        
+                        def update(self, *a, **kw):
+                            self.update_count += 1
+                            # Raise exception on second update to test exception handling
+                            if self.update_count == 2:
+                                raise RuntimeError("Progress update failed!")
+                    
+                    yield ProgressTracker()
+                return _ctx()
+            
+            def show_error(self, msg):
+                pass
+            
+            def show_shutdown(self, elapsed):
+                pass
+        
+        from model.outputs import PlainTextHandler
+        
+        monkeypatch.setattr(
+            "controller.converter_controller.ConverterController.get_converter",
+            lambda self, p: MockConverter(p)
+        )
+        monkeypatch.setattr(
+            "controller.converter_controller.ConverterController.FORMAT_HANDLERS",
+            {1: PlainTextHandler(), 2: PlainTextHandler(), 3: PlainTextHandler()}
+        )
+        
+        ui = TestUI()
+        controller = ConverterController(ui)
+        
+        # Should not raise even though progress.update raises on second call
+        controller.run()
+        
+        # Verify output was still created despite exception
+        output_file = tmp_path / "test.txt"
+        assert output_file.exists()

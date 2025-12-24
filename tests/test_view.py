@@ -283,6 +283,22 @@ class TestDisplayMethods:
         text = console.export_text()
         assert "conversion complete" in text.lower()
         assert "1.23" in text
+    
+    def test_clear_and_show_header(self):
+        """Test clear_and_show_header clears console and redraws header"""
+        console = Console(record=True)
+        ui = RetroCLI(console=console)
+        
+        # Add some initial content
+        console.print("initial content")
+        
+        # Clear and show header
+        ui.clear_and_show_header()
+        
+        # Verify header is shown and initial content is still there (console.clear() in record mode doesn't actually clear)
+        text = console.export_text()
+        assert "converter" in text.lower()
+        assert "v.1.0.0" in text
 
 
 class TestInteractiveSelection:

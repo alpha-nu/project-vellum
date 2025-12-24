@@ -100,6 +100,9 @@ class ConverterController:
             self.ui.show_no_files()
             return
         
+        # Clear screen and redraw header before processing
+        self.ui.clear_and_show_header()
+        
         # Get output handler
         handler = self.FORMAT_HANDLERS[format_choice]
         

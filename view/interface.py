@@ -21,6 +21,10 @@ class UIInterface(ABC):
         pass
 
     @abstractmethod
+    def clear_and_show_header(self):
+        pass
+
+    @abstractmethod
     def select_files(self, files: List[Path]) -> List[Path]:
         pass
 
