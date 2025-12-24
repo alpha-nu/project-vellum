@@ -49,3 +49,5 @@ jobs:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         publish_dir: ./htmlcov
         destination_dir: coverage
+        force_orphan: false
+        keep_files: false

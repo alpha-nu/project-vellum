@@ -10,7 +10,7 @@
 # THE DOCUMENT CONVERTER
 
 [![Tests](https://github.com/alpha-nu/project-vellum/actions/workflows/test.yml/badge.svg)](https://github.com/alpha-nu/project-vellum/actions/workflows/test.yml)
-[![Coverage](https://alpha-nu.github.io/project-vellum/coverage/badge.svg)](https://alpha-nu.github.io/project-vellum/coverage/)
+[![Coverage](https://alpha-nu.github.io/project-vellum/coverage/badge.svg?t=latest)](https://alpha-nu.github.io/project-vellum/coverage/)
 
 Vellum is a high-performance, object-oriented document extraction engine designed with a retro-terminal aesthetic. It transforms PDFs (including scanned images via OCR) and ePubs into clean, structured data.
 
