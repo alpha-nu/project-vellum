@@ -1,7 +1,16 @@
-# 📟 VELLUM: THE DOCUMENT CONVERTER
+```
+    ██╗   ██╗███████╗██╗     ██╗     ██╗   ██╗███╗   ███╗
+    ██║   ██║██╔════╝██║     ██║     ██║   ██║████╗ ████║
+    ██║   ██║█████╗  ██║     ██║     ██║   ██║██╔████╔██║
+    ╚██╗ ██╔╝██╔══╝  ██║     ██║     ██║   ██║██║╚██╔╝██║
+     ╚████╔╝ ███████╗███████╗███████╗╚██████╔╝██║ ╚═╝ ██║
+      ╚═══╝  ╚══════╝╚══════╝╚══════╝ ╚═════╝ ╚═╝     ╚═╝
+```
 
-[![Tests](https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/test.yml/badge.svg)](https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/test.yml)
-[![Coverage](https://YOUR_USERNAME.github.io/YOUR_REPO/coverage/badge.svg)](https://YOUR_USERNAME.github.io/YOUR_REPO/coverage/)
+# THE DOCUMENT CONVERTER
+
+[![Tests](https://github.com/alpha-nu/project-vellum/actions/workflows/test.yml/badge.svg)](https://github.com/alpha-nu/project-vellum/actions/workflows/test.yml)
+[![Coverage](https://alpha-nu.github.io/project-vellum/coverage/badge.svg)](https://alpha-nu.github.io/project-vellum/coverage/)
 
 Vellum is a high-performance, object-oriented document extraction engine designed with a retro-terminal aesthetic. It transforms PDFs (including scanned images via OCR) and ePubs into clean, structured data.
 
@@ -10,10 +19,12 @@ Vellum is optimized for **Python 3.13**
 ## 🛠 Features
 * **Dual-Engine Parsing:** Uses `PyMuPDF` for digital text and `Tesseract OCR` for scanned/image-based PDFs.
 * **ePub Scrubbing:** Deep-cleans ebook containers, stripping HTML/CSS while preserving narrative flow.
-* **Batch Processing:** Point the tool at a directory, and it will automatically detect and process all compatible files.
-* **Smart Merging:** Optional feature to consolidate an entire library into a single master file with source headers.
+* **Batch Processing:** Interactive file selector for directories - navigate and select files with keyboard controls.
+* **Per-Page/Chapter Output:** Extract each PDF page or ePub chapter as separate files.
+* **Smart Merging:** Consolidate multiple documents into a single master file with source attribution.
 * **Multi-Format Output:** Export to Plain Text (`.txt`), Markdown (`.md`), or JSON (`.json`).
-* **8-Bit Aesthetic:** A visual CLI built for the dark-mode purist, featuring ASCII art and progress tracking.
+* **Interactive CLI:** Retro-styled terminal interface with ASCII art, navigation controls, and real-time progress tracking.
+* **File Size Display:** See document sizes during selection for informed batch processing.
 * **Dockerized:** Fully containerized to handle complex system dependencies (Tesseract/Leptonica) out of the box.
 
 ---
@@ -37,14 +48,26 @@ Docker is the recommended way to run Vellum, as it packages the Tesseract OCR en
 
 ## 📖 CLI Workflow
 
-Once launched, the "System Ready" prompt will guide you through the conversion:
+Once launched, Vellum's interactive interface guides you through the conversion:
 
-1.  **INPUT_PATH:** * Provide a specific file path (e.g., `/data/book.pdf`).
-    * Provide a directory path (e.g., `/data`) to trigger **Batch Mode**.
-2.  **SELECT_FORMAT:** Choose between `.txt`, `.md`, or `.json`.
-3.  **MERGE_PROMPT:** If you are processing a directory, you will be asked if you want to merge all outputs into a single file. 
-    * `Y`: Creates one "Master" file containing all extracted text with separators.
-    * `N`: Creates individual output files for every source document.
+1. **Input Path:** 
+   - Provide a specific file path (e.g., `/data/book.pdf`)
+   - Provide a directory path (e.g., `/data`) to trigger **Batch Mode**
+
+2. **Output Format:** 
+   - Choose between Plain Text (`.txt`), Markdown (`.md`), or JSON (`.json`)
+
+3. **File Selection** (Batch Mode only):
+   - Navigate files with ⬆︎ /⬇︎ arrow keys
+   - Toggle selection with `SPACE`
+   - Select all with `A`, quit with `Q`
+   - Confirm with `ENTER`
+   - Files display with sizes for reference
+
+4. **Merge Mode:**
+   - **No merge:** Individual output file per source document
+   - **Merge:** Combine all into single file with source headers
+   - **File per page:** One output file per PDF page or ePub chapter
 
 ---
 
@@ -71,31 +94,39 @@ python main.py
 
 ## 🧪 Testing
 
-Vellum follows **MVC architecture** with full unit test coverage and comprehensive test coverage reporting.
+Vellum follows **MVC architecture** with comprehensive unit test coverage (98%+) and automated testing on every commit.
 
-### Running Tests
+### Running Tests Locally
 
 **Run all tests with coverage:**
 ```bash
-pytest tests/ -v
+pytest tests/ -v --cov=. --cov-report=term --cov-report=html
 ```
 
-**Run specific test files:**
+**Run specific test modules:**
 ```bash
-pytest tests/test_controller.py -v
-pytest tests/test_model.py -v
-pytest tests/test_view.py -v
+pytest tests/test_controller.py -v    # Controller layer
+pytest tests/test_converters.py -v    # Document converters
+pytest tests/test_outputs.py -v       # Output formatters
+pytest tests/test_view.py -v          # UI components
+pytest tests/test_model.py -v         # Model utilities
 ```
 
-**Run without coverage (faster for development):**
+**Quick test run (no coverage):**
 ```bash
 pytest tests/ -v --no-cov
 ```
 
-**Test structure:**
-- `tests/test_model.py` — Model layer (converters, extractors)
-- `tests/test_view.py` — View layer (UI components)
-- `tests/test_controller.py` — Controller layer (orchestration)
+### Test Structure
+
+```
+tests/
+├── test_controller.py    # Controller orchestration and workflow
+├── test_converters.py    # PDF/ePub extraction engines
+├── test_outputs.py       # Plain text, Markdown, JSON handlers
+├── test_view.py          # CLI interface and user interactions
+└── test_model.py         # Model layer utilities
+```
 
 ### Coverage Reports
 
@@ -104,66 +135,90 @@ Tests automatically generate coverage reports in multiple formats:
 **1. Terminal Report**
 - Displays during test execution
 - Shows coverage percentage per file
-- Lists missing line numbers
+- Lists uncovered line numbers
 
-**2. HTML Report**
+**2. HTML Report** (Interactive)
 - Located in `htmlcov/` directory
-- Interactive line-by-line coverage view
-- Color-coded: Green (covered) / Red (not covered)
+- Line-by-line coverage visualization
+- Color-coded: Green (covered) / Red (missing)
 
 ```bash
 # Open HTML coverage report
 open htmlcov/index.html          # macOS
 xdg-open htmlcov/index.html      # Linux
+start htmlcov/index.html         # Windows
 ```
 
-**3. XML Report**
+**3. XML Report** (CI/CD)
 - Located at `coverage.xml`
-- For CI/CD tools (Codecov, Coveralls, SonarQube)
+- Used by GitHub Actions workflow
 
-### Current Coverage
+### CI/CD Integration
 
-```
-controller/converter_controller.py  72.60%
-model/converters.py                 28.57%  ⚠️ Needs improvement
-model/core.py                       84.62%
-model/outputs.py                    66.67%
-view/interface.py                  100.00%  ✅
-view/ui.py                          31.96%  ⚠️ Needs improvement
--------------------------------------------------------------------
-TOTAL                               44.57%
-```
+GitHub Actions automatically:
+- ✅ Runs full test suite on every commit to `main`
+- ✅ Generates coverage reports
+- ✅ Publishes coverage to GitHub Pages: [View Coverage](https://alpha-nu.github.io/project-vellum/coverage/)
+- ✅ Updates coverage badge in README
 
-**Coverage Target:** 80% overall
+**Workflow file:** `.github/workflows/test.yml`
 
-**Priority areas for improvement:**
-- `model/converters.py` — Core extraction logic
-- `model/outputs.py` — Format handlers
-- `view/ui.py` — UI components (lower priority)
+### Coverage Configuration
 
-### Configuration
-
-Coverage is configured via `.coveragerc` and `pytest.ini`:
-- Tracks `model/`, `view/`, `controller/` modules
-- Excludes test files and virtual environments
-- Generates terminal, HTML, and XML reports
-
-See [`cli_testing_tips.md`](cli_testing_tips.md) for E2E testing strategies and automation patterns.
+Configured via `pytest.ini` and `.coveragerc`:
+- Tracks: `model/`, `view/`, `controller/` modules
+- Excludes: test files, virtual environments, `__pycache__`
+- Reports: terminal, HTML, XML formats
 
 ---
 
 ## 🏗 Architecture
 
-Vellum implements **Model-View-Controller (MVC)** separation:
+Vellum implements **Model-View-Controller (MVC)** with strict separation of concerns:
 
-- **Model** (`model/core.py`, `model/converters.py`, `model/outputs.py`) — Business logic and document extraction
-- **View** (`view/ui.py`, `view/interface.py`) — UI rendering and user interaction
-- **Controller** (`main.py`) — Orchestration with dependency injection
+### Project Structure
 
-This architecture ensures:
-- ✅ Separation of concerns
-- ✅ Independent unit testing of each layer
-- ✅ Easy extensibility for new formats and outputs
+```
+vellum/
+├── main.py                      # Entry point
+├── controller/
+│   └── converter_controller.py  # Orchestration logic
+├── model/
+│   ├── core.py                  # Abstract base classes
+│   ├── converters.py            # PDF/ePub extraction engines
+│   ├── outputs.py               # Format handlers
+│   └── file.py                  # File model with metadata
+├── view/
+│   ├── interface.py             # UI interface contract
+│   └── ui.py                    # Rich-based terminal UI
+└── tests/
+    ├── test_controller.py       # Controller tests
+    ├── test_converters.py       # Converter tests
+    ├── test_outputs.py          # Output handler tests
+    ├── test_view.py             # UI tests
+    └── test_model.py            # Model utilities tests
+```
+
+### Design Patterns
+
+- **MVC Architecture:** Clean separation between business logic, UI, and orchestration
+- **Abstract Base Classes:** `BaseConverter` and `OutputHandler` enable easy extension
+- **Dependency Injection:** Controller receives UI interface for testability
+- **Model Layer:** `File` model encapsulates file metadata and presentation logic
+- **View Passivity:** UI only displays primitive data, no business logic
+
+### Extensibility
+
+**Adding a new document type:**
+1. Create `NewTypeConverter(BaseConverter)` in `model/converters.py`
+2. Implement `extract_content() → str`
+3. Update `CONVERTER_MAP` in `controller/converter_controller.py`
+
+**Adding a new output format:**
+1. Create `NewFormatHandler(OutputHandler)` in `model/outputs.py`
+2. Implement `save(content: str, destination: Path)`
+3. Update `FORMAT_HANDLERS` in `controller/converter_controller.py`
+4. Update UI format options in `view/ui.py`
 
 ---
 
