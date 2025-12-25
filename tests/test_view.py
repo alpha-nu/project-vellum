@@ -394,7 +394,7 @@ class TestInteractiveSelection:
     def _paths_to_file_data(paths):
         """Convert Path objects to file data dicts for view."""
         from model.file import File
-        return [File(p).to_dict() for p in paths]
+        return [File.from_path(p).to_dict() for p in paths]
     
     @patch('view.ui.readchar.readchar')
     def test_select_files_enter_immediately(self, mock_readchar, tmp_path):
