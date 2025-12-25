@@ -88,3 +88,7 @@ docker run -it -v "/path/to/docs:/data" vellum-converter
 - MarkdownHandler prepends `# SOURCE: {filename}` header
 - JSON output includes nested `source` and `content` fields
 - Progress bar updates on file processing, not extraction completion
+
+## Good Agent Practices
+1. ALWAYS run tests after changes you make
+2. ALWAYS make sure the README.md is in sync with every new feature you implement.
