@@ -57,10 +57,6 @@ class UIInterface(ABC):
         pass
 
     @abstractmethod
-    def show_merge_complete(self, output_name: str):
-        pass
-
-    @abstractmethod
     def show_conversion_summary(
         self, 
         total_files: int, 
@@ -68,7 +64,8 @@ class UIInterface(ABC):
         merge_mode: str, 
         merged_filename: Optional[str], 
         total_runtime: float, 
-        total_input_size_formatted: str
+        total_input_size_formatted: str,
+        total_output_size_formatted: str
     ):
         """Display comprehensive conversion summary and completion message.
         

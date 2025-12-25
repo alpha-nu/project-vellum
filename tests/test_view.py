@@ -263,17 +263,6 @@ class TestDisplayMethods:
         text = console.export_text()
         assert "no compatible files" in text.lower()
     
-    def test_show_merge_complete(self):
-        """Test merge completion message"""
-        console = Console(record=True)
-        ui = RetroCLI(console=console)
-        
-        ui.show_merge_complete("merged_output.txt")
-        
-        text = console.export_text()
-        assert "merge complete" in text.lower()
-        assert "merged_output.txt" in text
-    
     def test_show_shutdown(self):
         """Test shutdown message with various times"""
         console = Console(record=True)
@@ -297,7 +286,8 @@ class TestDisplayMethods:
             merge_mode="no_merge",
             merged_filename=None,
             total_runtime=45.67,
-            total_input_size_formatted="2.0MB"
+            total_input_size_formatted="2.0MB",
+            total_output_size_formatted="1.5MB"
         )
         
         text = console.export_text()
@@ -317,7 +307,8 @@ class TestDisplayMethods:
             merge_mode="merge",
             merged_filename="combined.txt",
             total_runtime=12.34,
-            total_input_size_formatted="1.0MB"
+            total_input_size_formatted="1.0MB",
+            total_output_size_formatted="800.0KB"
         )
         
         text = console.export_text()
@@ -335,7 +326,8 @@ class TestDisplayMethods:
             merge_mode="per_page",
             merged_filename=None,
             total_runtime=8.90,
-            total_input_size_formatted="500.0KB"
+            total_input_size_formatted="500.0KB",
+            total_output_size_formatted="300.0KB"
         )
         
         text = console.export_text()
@@ -354,7 +346,8 @@ class TestDisplayMethods:
             merge_mode="no_merge",
             merged_filename=None,
             total_runtime=1.0,
-            total_input_size_formatted="512B"
+            total_input_size_formatted="512B",
+            total_output_size_formatted="256B"
         )
         
         text = console.export_text()
@@ -370,7 +363,8 @@ class TestDisplayMethods:
             merge_mode="no_merge",
             merged_filename=None,
             total_runtime=1.0,
-            total_input_size_formatted="1.0TB"
+            total_input_size_formatted="1.0TB",
+            total_output_size_formatted="500.0GB"
         )
         
         text = console.export_text()
@@ -753,7 +747,6 @@ def test_retrocli_basic_rendering():
     ui.print_panel("hello world")
     ui.show_error("something went wrong")
     ui.show_no_files()
-    ui.show_merge_complete("out.txt")
     ui.show_shutdown(1.23)
 
 

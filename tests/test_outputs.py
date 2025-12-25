@@ -15,11 +15,12 @@ class TestPlainTextHandler:
         dest = tmp_path / "output"
         content = "Test content\nMultiple lines"
         
-        handler.save(content, dest)
+        size = handler.save(content, dest)
         
         output_file = tmp_path / "output.txt"
         assert output_file.exists()
         assert output_file.read_text(encoding="utf-8") == content
+        assert size == len(content.encode('utf-8'))
     
     def test_plain_text_with_existing_extension(self, tmp_path):
         """Test that .txt extension replaces existing extension"""
@@ -27,11 +28,12 @@ class TestPlainTextHandler:
         dest = tmp_path / "output.pdf"
         content = "Test content"
         
-        handler.save(content, dest)
+        size = handler.save(content, dest)
         
         output_file = tmp_path / "output.txt"
         assert output_file.exists()
         assert not (tmp_path / "output.pdf").exists()
+        assert size == len(content.encode('utf-8'))
     
     def test_plain_text_unicode_content(self, tmp_path):
         """Test handling Unicode content"""
@@ -39,11 +41,12 @@ class TestPlainTextHandler:
         dest = tmp_path / "unicode_output"
         content = "Test with émojis 🚀 and spëcial çhars"
         
-        handler.save(content, dest)
+        size = handler.save(content, dest)
         
         output_file = tmp_path / "unicode_output.txt"
         assert output_file.exists()
         assert output_file.read_text(encoding="utf-8") == content
+        assert size == len(content.encode('utf-8'))
 
 
 class TestMarkdownHandler:
@@ -55,7 +58,7 @@ class TestMarkdownHandler:
         dest = tmp_path / "output"
         content = "Test content"
         
-        handler.save(content, dest)
+        size = handler.save(content, dest)
         
         output_file = tmp_path / "output.md"
         assert output_file.exists()
@@ -63,6 +66,7 @@ class TestMarkdownHandler:
         result = output_file.read_text(encoding="utf-8")
         assert result.startswith("# source: output")
         assert "Test content" in result
+        assert size == len(result.encode('utf-8'))
     
     def test_markdown_preserves_content(self, tmp_path):
         """Test that markdown preserves original content"""
@@ -70,7 +74,7 @@ class TestMarkdownHandler:
         dest = tmp_path / "test_file"
         content = "Line 1\nLine 2\nLine 3"
         
-        handler.save(content, dest)
+        size = handler.save(content, dest)
         
         output_file = tmp_path / "test_file.md"
         result = output_file.read_text(encoding="utf-8")
@@ -81,6 +85,7 @@ class TestMarkdownHandler:
         assert "Line 1" in result
         assert "Line 2" in result
         assert "Line 3" in result
+        assert size == len(result.encode('utf-8'))
     
     def test_markdown_with_special_chars(self, tmp_path):
         """Test markdown with special characters"""
@@ -88,12 +93,13 @@ class TestMarkdownHandler:
         dest = tmp_path / "special.pdf"
         content = "Content with *asterisks* and _underscores_"
         
-        handler.save(content, dest)
+        size = handler.save(content, dest)
         
         output_file = tmp_path / "special.md"
         assert output_file.exists()
         result = output_file.read_text(encoding="utf-8")
         assert content in result
+        assert size == len(result.encode('utf-8'))
 
 
 class TestJSONHandler:
@@ -105,7 +111,7 @@ class TestJSONHandler:
         dest = tmp_path / "output"
         content = "Test content"
         
-        handler.save(content, dest)
+        size = handler.save(content, dest)
         
         output_file = tmp_path / "output.json"
         assert output_file.exists()
@@ -117,6 +123,7 @@ class TestJSONHandler:
         assert "content" in data
         assert data["source"] == "output"
         assert data["content"] == content
+        assert size == len(json.dumps(data, indent=4).encode('utf-8'))
     
     def test_json_structure(self, tmp_path):
         """Test JSON output structure"""
@@ -124,7 +131,7 @@ class TestJSONHandler:
         dest = tmp_path / "test.epub"
         content = "Multi-line\ncontent\nhere"
         
-        handler.save(content, dest)
+        size = handler.save(content, dest)
         
         output_file = tmp_path / "test.json"
         with open(output_file) as f:
@@ -134,6 +141,7 @@ class TestJSONHandler:
         assert set(data.keys()) == {"source", "content"}
         assert data["source"] == "test.epub"
         assert data["content"] == content
+        assert size == len(json.dumps(data, indent=4).encode('utf-8'))
     
     def test_json_indentation(self, tmp_path):
         """Test JSON is properly indented"""
@@ -141,13 +149,15 @@ class TestJSONHandler:
         dest = tmp_path / "output"
         content = "Test"
         
-        handler.save(content, dest)
+        size = handler.save(content, dest)
         
         output_file = tmp_path / "output.json"
         json_text = output_file.read_text()
         
         # Check for indentation (4 spaces as per json.dump)
         assert "    " in json_text
+        assert size == len(json_text.encode('utf-8'))
+        assert size == len(json_text.encode('utf-8'))
     
     def test_json_unicode_content(self, tmp_path):
         """Test JSON with Unicode content"""
@@ -155,13 +165,14 @@ class TestJSONHandler:
         dest = tmp_path / "unicode"
         content = "Unicode: émojis 🎉, spëcial çhars"
         
-        handler.save(content, dest)
+        size = handler.save(content, dest)
         
         output_file = tmp_path / "unicode.json"
         with open(output_file, encoding="utf-8") as f:
             data = json.load(f)
         
         assert data["content"] == content
+        assert size == len(json.dumps(data, indent=4).encode('utf-8'))
     
     def test_json_large_content(self, tmp_path):
         """Test JSON with large content"""
@@ -169,7 +180,7 @@ class TestJSONHandler:
         dest = tmp_path / "large"
         content = "Line\n" * 1000  # 1000 lines
         
-        handler.save(content, dest)
+        size = handler.save(content, dest)
         
         output_file = tmp_path / "large.json"
         with open(output_file) as f:
@@ -177,6 +188,7 @@ class TestJSONHandler:
         
         assert data["content"] == content
         assert data["content"].count("\n") == 1000
+        assert size == len(json.dumps(data, indent=4).encode('utf-8'))
 
 
 class TestOutputHandlersEdgeCases:
@@ -192,10 +204,16 @@ class TestOutputHandlersEdgeCases:
         
         for handler, ext in handlers:
             dest = tmp_path / f"empty{ext}"
-            handler.save("", dest.with_suffix(""))
+            size = handler.save("", dest.with_suffix(""))
             
             output_file = tmp_path / f"empty{ext}"
             assert output_file.exists()
+            if ext == ".txt":
+                # Plain text can be 0 bytes for empty content
+                assert size >= 0
+            else:
+                # JSON and Markdown have structure even for empty content
+                assert size > 0
     
     def test_very_long_filename(self, tmp_path):
         """Test handlers with long filenames"""
@@ -208,10 +226,11 @@ class TestOutputHandlersEdgeCases:
         
         for handler, ext in handlers:
             dest = tmp_path / long_name
-            handler.save("content", dest)
+            size = handler.save("content", dest)
             
             output_file = tmp_path / f"{long_name}{ext}"
             assert output_file.exists()
+            assert size > 0
     
     def test_nested_path(self, tmp_path):
         """Test handlers with nested directory paths"""
@@ -226,10 +245,11 @@ class TestOutputHandlersEdgeCases:
         
         for handler, ext in handlers:
             dest = nested_dir / "nested_file"
-            handler.save("test content", dest)
+            size = handler.save("test content", dest)
             
             output_file = nested_dir / f"nested_file{ext}"
             assert output_file.exists()
+            assert size > 0
 
 
 class TestPerPageOutputHandlers:
@@ -241,7 +261,7 @@ class TestPerPageOutputHandlers:
         destination = tmp_path / "document.pdf"
         contents = ["Page 1 text", "Page 2 text", "Page 3 text"]
         
-        handler.save_multiple(contents, destination, "document.pdf")
+        total_size = handler.save_multiple(contents, destination, "document.pdf")
         
         # Check that 3 files were created
         assert (tmp_path / "document_page_1.txt").exists()
@@ -252,6 +272,10 @@ class TestPerPageOutputHandlers:
         assert (tmp_path / "document_page_1.txt").read_text() == "Page 1 text"
         assert (tmp_path / "document_page_2.txt").read_text() == "Page 2 text"
         assert (tmp_path / "document_page_3.txt").read_text() == "Page 3 text"
+        
+        # Check total size
+        expected_size = sum(len(content.encode('utf-8')) for content in contents)
+        assert total_size == expected_size
     
     def test_markdown_save_multiple(self, tmp_path):
         """Test MarkdownHandler.save_multiple creates numbered markdown files"""
@@ -259,7 +283,7 @@ class TestPerPageOutputHandlers:
         destination = tmp_path / "book.epub"
         contents = ["Chapter 1", "Chapter 2"]
         
-        handler.save_multiple(contents, destination, "book.epub")
+        total_size = handler.save_multiple(contents, destination, "book.epub")
         
         # Check files exist
         assert (tmp_path / "book_page_1.md").exists()
@@ -273,6 +297,9 @@ class TestPerPageOutputHandlers:
         page2 = (tmp_path / "book_page_2.md").read_text()
         assert page2.startswith("# source: book.epub (page 2)")
         assert "Chapter 2" in page2
+        
+        # Check total size
+        assert total_size == len(page1.encode('utf-8')) + len(page2.encode('utf-8'))
     
     def test_json_save_multiple(self, tmp_path):
         """Test JSONHandler.save_multiple creates numbered JSON files"""
@@ -280,7 +307,7 @@ class TestPerPageOutputHandlers:
         destination = tmp_path / "doc.pdf"
         contents = ["First page", "Second page"]
         
-        handler.save_multiple(contents, destination, "doc.pdf")
+        total_size = handler.save_multiple(contents, destination, "doc.pdf")
         
         # Check files exist
         assert (tmp_path / "doc_page_1.json").exists()
@@ -298,6 +325,11 @@ class TestPerPageOutputHandlers:
         assert data2["source"] == "doc.pdf"
         assert data2["page"] == 2
         assert data2["content"] == "Second page"
+        
+        # Check total size
+        json1_text = json.dumps(data1, indent=4)
+        json2_text = json.dumps(data2, indent=4)
+        assert total_size == len(json1_text.encode('utf-8')) + len(json2_text.encode('utf-8'))
     
     def test_save_multiple_empty_list(self, tmp_path):
         """Test save_multiple with empty content list"""

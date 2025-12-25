@@ -57,9 +57,6 @@ class FakeUI:
     def show_no_files(self, *a, **k):
         pass
 
-    def show_merge_complete(self, *a, **k):
-        pass
-
     def show_shutdown(self, *a, **k):
         pass
 
@@ -170,16 +167,12 @@ def test_controller_merge_mode(tmp_path, monkeypatch):
     class MergeUI(FakeUI):
         def __init__(self, directory):
             super().__init__(directory)
-            self.merge_complete_called = False
         
         def get_user_input(self):
             return str(self._tmp), 1, "merge"  # Enable merge
         
         def select_files(self, file_data):
             return list(range(len(file_data)))
-        
-        def show_merge_complete(self, output_name):
-            self.merge_complete_called = True
     
     monkeypatch.setattr(
         "controller.converter_controller.ConverterController.get_converter",
@@ -190,7 +183,6 @@ def test_controller_merge_mode(tmp_path, monkeypatch):
     controller = ConverterController(ui)
     controller.run()
     
-    assert ui.merge_complete_called
     # Check merged file was created
     merged_file = tmp_path / "merged_output.txt"
     assert merged_file.exists()
@@ -324,59 +316,6 @@ class TestControllerEdgeCases:
         # Should handle None converter without crashing
         controller.run()
     
-    def test_controller_per_page_no_merge_complete(self, tmp_path, monkeypatch):
-        """Test that per_page mode doesn't call show_merge_complete"""
-        
-        class MockConverter:
-            def __init__(self, path):
-                self.path = path
-            
-            def extract_content(self, progress_callback=None):
-                return "content"
-            
-            def extract_content_per_item(self, progress_callback=None):
-                if progress_callback:
-                    progress_callback(1, 1)
-                return ["page1", "page2"]
-        
-        class MockHandler:
-            def save(self, content, destination):
-                pass
-            
-            def save_multiple(self, contents, destination, source_name):
-                pass
-        
-        test_file = tmp_path / "test.pdf"
-        test_file.write_text("content")
-        
-        merge_called = []
-        
-        class TestUI(FakeUI):
-            def __init__(self, file):
-                super().__init__(file)
-            
-            def get_user_input(self):
-                return str(test_file), 1, "per_page"
-            
-            def show_merge_complete(self, name):
-                merge_called.append(name)
-        
-        monkeypatch.setattr(
-            "controller.converter_controller.ConverterController.get_converter",
-            lambda self, p: MockConverter(p)
-        )
-        monkeypatch.setattr(
-            "controller.converter_controller.ConverterController.FORMAT_HANDLERS",
-            {1: MockHandler(), 2: MockHandler(), 3: MockHandler()}
-        )
-        
-        ui = TestUI(test_file)
-        controller = ConverterController(ui)
-        controller.run()
-        
-        # Merge complete should NOT be called in per_page mode
-        assert len(merge_called) == 0
-    
     def test_controller_merge_single_file(self, tmp_path, monkeypatch):
         """Test merge mode with single file creates _merged output"""
         
@@ -394,7 +333,9 @@ class TestControllerEdgeCases:
         
         class MockHandler:
             def save(self, content, destination):
-                destination.with_suffix(".txt").write_text(content, encoding="utf-8")
+                output_path = destination.with_suffix(".txt")
+                output_path.write_text(content, encoding="utf-8")
+                return output_path.stat().st_size
             
             def save_multiple(self, contents, destination, source_name):
                 pass
@@ -402,17 +343,12 @@ class TestControllerEdgeCases:
         test_file = tmp_path / "document.pdf"
         test_file.write_text("content")
         
-        merge_complete_name = []
-        
         class TestUI(FakeUI):
             def __init__(self, file):
                 super().__init__(file)
             
             def get_user_input(self):
                 return str(test_file), 1, "merge"
-            
-            def show_merge_complete(self, name):
-                merge_complete_name.append(name)
         
         monkeypatch.setattr(
             "controller.converter_controller.ConverterController.get_converter",
@@ -428,9 +364,6 @@ class TestControllerEdgeCases:
         controller.run()
         
         # Verify merged output was created
-        assert len(merge_complete_name) == 1
-        assert "merged" in merge_complete_name[0]
-        
         merged_file = tmp_path / "document_merged.txt"
         assert merged_file.exists()
 
@@ -465,6 +398,7 @@ class TestControllerPerPageMode:
             
             def save_multiple(self, contents, destination, source_name):
                 save_multiple_called.append((contents, destination, source_name))
+                return 100  # Mock size
         
         # Create test file
         test_file = tmp_path / "test.pdf"

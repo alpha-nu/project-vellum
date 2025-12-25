@@ -457,14 +457,6 @@ class RetroCLI(UIInterface):
     def show_no_files(self):
         self.print_panel("no compatible files found", content_color_key="error")
 
-    def show_merge_complete(self, output_name: str):
-        panel = Panel(
-            Text.from_markup(f"[{self.colors['confirm']}]merge complete: {output_name}[/]"),
-            border_style=self.colors["subtle"],
-            width=min(self.max_width, self.console.size.width),
-        )
-        self.print_center(panel)
-
     def show_conversion_summary(
         self, 
         total_files: int, 
@@ -472,7 +464,8 @@ class RetroCLI(UIInterface):
         merge_mode: str, 
         merged_filename: Optional[str], 
         total_runtime: float, 
-        total_input_size_formatted: str
+        total_input_size_formatted: str,
+        total_output_size_formatted: str
     ):
         """Display comprehensive conversion summary and completion message."""
         # Format runtime
@@ -492,7 +485,8 @@ class RetroCLI(UIInterface):
             f"[{self.colors['confirm']}]conversion complete[/]\n\n"
             f"[{self.colors['primary']}]files processed:{'':<4}[/] [{self.colors['secondary']}]{total_files}[/]\n"
             f"[{self.colors['primary']}]output created:{'':<5}[/] [{self.colors['secondary']}]{output_desc}[/]\n"
-            f"[{self.colors['primary']}]input size:{'':<9}[/] [{self.colors['secondary']}]{total_input_size_formatted}[/]\n\n"
+            f"[{self.colors['primary']}]input size:{'':<9}[/] [{self.colors['secondary']}]{total_input_size_formatted}[/]\n"
+            f"[{self.colors['primary']}]output size:{'':<8}[/] [{self.colors['secondary']}]{total_output_size_formatted}[/]\n\n"
             f"[{self.colors['accented']}]total runtime:{'':<6} {runtime_str}[/]\n"
         )
         
