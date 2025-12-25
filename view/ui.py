@@ -106,13 +106,13 @@ class RetroCLI(UIInterface):
         # Color scheme: primary (purple) for main text, subtle (grey) for borders,
         # secondary (cyan) for interactive elements, accented (gold) for progress
         default_colors = {
-            "subtle": "#9aa0a6",     # Soft grey for borders and subtle UI elements
-            "primary": "#e9d8ff",    # Soft purple for primary text and prompts
             "logo": "#c25a1a",       # Orange/rust for the ASCII logo
-            "error": "#ff6b81",      # Rosy red for error messages
-            "confirm": "#52d9d8",    # Teal for confirmations and success
+            "primary": "#e9d8ff",    # Soft purple for primary text and prompts
+            "secondary": "#52d9d8",  # Teal for interactive options and highlights
+            "subtle": "#9aa0a6",     # Soft grey for borders and subtle UI elements
             "accented": "#c9a961",   # Gold for progress indicators and emphasis
-            "secondary": "#7dd9d8",  # Cyan for interactive options and highlights
+            "confirm": "#6fc67c",    # Light green for confirmations and success
+            "error": "#ff6b81",      # Rosy red for error messages
         }
         self.colors = {**default_colors, **(colors or {})}
 
