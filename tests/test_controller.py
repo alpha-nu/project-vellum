@@ -63,6 +63,9 @@ class FakeUI:
     def show_shutdown(self, *a, **k):
         pass
 
+    def show_conversion_summary(self, *a, **k):
+        pass
+
 
 class FakeConverter:
     def __init__(self, path):
@@ -498,6 +501,9 @@ class TestControllerPerPageMode:
             
             def show_shutdown(self, elapsed):
                 pass
+            
+            def show_conversion_summary(self, *a, **k):
+                pass
         
         # Patch converter and handler
         monkeypatch.setattr(
@@ -586,6 +592,9 @@ class TestControllerPerPageMode:
                 pass
             
             def show_shutdown(self, elapsed):
+                pass
+            
+            def show_conversion_summary(self, *a, **k):
                 pass
         
         from model.outputs import PlainTextHandler

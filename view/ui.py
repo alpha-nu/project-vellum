@@ -465,6 +465,44 @@ class RetroCLI(UIInterface):
         )
         self.print_center(panel)
 
+    def show_conversion_summary(
+        self, 
+        total_files: int, 
+        output_count: int, 
+        merge_mode: str, 
+        merged_filename: Optional[str], 
+        total_runtime: float, 
+        total_input_size_formatted: str
+    ):
+        """Display comprehensive conversion summary and completion message."""
+        # Format runtime
+        runtime_str = f"{total_runtime:.2f}s"
+        
+        # Determine output description based on merge mode
+        if merge_mode == "merge":
+            output_desc = f"1 merged file"
+            if merged_filename:
+                output_desc += f" ({merged_filename})"
+        elif merge_mode == "per_page":
+            output_desc = f"{output_count} pages/chapters"
+        else:  # no_merge
+            output_desc = f"{output_count} files"
+        
+        content = (
+            f"[{self.colors['confirm']}]conversion complete[/]\n\n"
+            f"[{self.colors['primary']}]files processed:{'':<4}[/] [{self.colors['secondary']}]{total_files}[/]\n"
+            f"[{self.colors['primary']}]output created:{'':<5}[/] [{self.colors['secondary']}]{output_desc}[/]\n"
+            f"[{self.colors['primary']}]input size:{'':<9}[/] [{self.colors['secondary']}]{total_input_size_formatted}[/]\n\n"
+            f"[{self.colors['accented']}]total runtime:{'':<6} {runtime_str}[/]\n"
+        )
+        
+        panel = Panel(
+            Text.from_markup(content),
+            border_style=self.colors["subtle"],
+            width=min(self.max_width, self.console.size.width),
+        )
+        self.print_center(panel)
+
     def show_shutdown(self, elapsed_seconds: float):
         content = (
             f"[{self.colors['confirm']}]conversion complete[/]\n"

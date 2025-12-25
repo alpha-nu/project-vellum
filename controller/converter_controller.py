@@ -107,17 +107,29 @@ class ConverterController:
         # Get output handler
         handler = self.FORMAT_HANDLERS[format_choice]
         
+        # Calculate total input size
+        total_input_size = sum(file.stat().st_size for file in files)
+        
         # Process files
         start_time = time.perf_counter()
-        accumulator = self._process_files(files, handler, merge_mode)
+        accumulator, output_count = self._process_files(files, handler, merge_mode)
         
         # Handle output based on merge mode
+        merged_filename = None
         if merge_mode == "merge" and accumulator:
-            self._save_merged_output(input_path, handler, accumulator)
+            merged_filename = self._save_merged_output(input_path, handler, accumulator)
+            output_count = 1  # Override with 1 for merged output
         
-        # Show completion
+        # Show comprehensive conversion summary
         elapsed = time.perf_counter() - start_time
-        self.ui.show_shutdown(elapsed)
+        self.ui.show_conversion_summary(
+            total_files=len(files),
+            output_count=output_count,
+            merge_mode=merge_mode,
+            merged_filename=merged_filename,
+            total_runtime=elapsed,
+            total_input_size_formatted=File.format_file_size(total_input_size)
+        )
     
     def _get_files_to_process(self, input_path: Path) -> List[Path]:
         """
@@ -142,7 +154,7 @@ class ConverterController:
         files: List[Path], 
         handler: OutputHandler, 
         merge_mode: str
-    ) -> List[str]:
+    ) -> tuple[List[str], int]:
         """
         Process all files with progress tracking.
         
@@ -152,9 +164,12 @@ class ConverterController:
             merge_mode: One of "no_merge", "merge", or "per_page"
             
         Returns:
-            List of accumulated content (empty unless merge_mode == "merge")
+            Tuple of (accumulator, output_count)
+            - accumulator: List of accumulated content (empty unless merge_mode == "merge")
+            - output_count: Number of output files/pages/chapters created
         """
         accumulator = []
+        output_count = 0
         
         with self.ui.get_progress_bar() as progress:
             # Create progress task for each file
@@ -169,7 +184,7 @@ class ConverterController:
             }
             
             for file in files:
-                content = self._process_single_file(
+                content, file_output_count = self._process_single_file(
                     file, 
                     tasks[file], 
                     progress, 
@@ -177,12 +192,14 @@ class ConverterController:
                     merge_mode
                 )
                 
+                output_count += file_output_count
+                
                 if content and merge_mode == "merge":
                     accumulator.append(
                         f"\n--- start source: {file.name} ---\n{content}"
                     )
         
-        return accumulator
+        return accumulator, output_count
     
     def _process_single_file(
         self, 
@@ -191,7 +208,7 @@ class ConverterController:
         progress, 
         handler: OutputHandler, 
         merge_mode: str
-    ) -> Optional[str]:
+    ) -> tuple[Optional[str], int]:
         """
         Process a single file with progress tracking.
         
@@ -203,7 +220,9 @@ class ConverterController:
             merge_mode: One of "no_merge", "merge", or "per_page"
             
         Returns:
-            Extracted content if merge_mode == "merge", None otherwise
+            Tuple of (content, output_count)
+            - content: Extracted content if merge_mode == "merge", None otherwise
+            - output_count: Number of output files/pages/chapters created for this file
         """
         file_start = time.perf_counter()
         
@@ -219,7 +238,7 @@ class ConverterController:
         # Get converter
         converter = self.get_converter(file)
         if not converter:
-            return None
+            return None, 0
         
         # Create progress callback
         def progress_callback(current, total):
@@ -236,10 +255,12 @@ class ConverterController:
                 pass
         
         # Extract and save based on merge mode
+        output_count = 0
         if merge_mode == "per_page":
             # Per-page output: extract and save individual pages as separate files
             contents = converter.extract_content_per_item(progress_callback=progress_callback)
             handler.save_multiple(contents, file, file.name)
+            output_count = len(contents)  # Number of pages/chapters
             content = None  # No content to accumulate for merge
         else:
             # Extract content as single string
@@ -249,7 +270,9 @@ class ConverterController:
             if merge_mode == "no_merge":
                 # Save as single file (existing behavior)
                 handler.save(content, file)
+                output_count = 1  # One output file per input file
             # If merge_mode == "merge", don't save now, will be merged later
+            # output_count will be set to 1 later for the merged file
         
         # Mark as complete
         file_elapsed = time.perf_counter() - file_start
@@ -261,14 +284,14 @@ class ConverterController:
             conversion_time=file_elapsed,
         )
         
-        return content
+        return content, output_count
     
     def _save_merged_output(
         self, 
         input_path: Path, 
         handler: OutputHandler, 
         accumulator: List[str]
-    ):
+    ) -> str:
         """
         Save merged output to single file.
         
@@ -276,6 +299,9 @@ class ConverterController:
             input_path: Original input path
             handler: Output format handler
             accumulator: List of content strings to merge
+            
+        Returns:
+            Name of the merged output file
         """
         if input_path.is_dir():
             output_name = input_path / "merged_output"
@@ -284,3 +310,5 @@ class ConverterController:
         
         handler.save("\n\n".join(accumulator), output_name)
         self.ui.show_merge_complete(output_name.name)
+        
+        return output_name.name

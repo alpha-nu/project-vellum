@@ -9,6 +9,26 @@ class File:
     
     path: Path
     
+    @staticmethod
+    def format_file_size(size_bytes: int) -> str:
+        """
+        Format file size in human-readable format.
+        
+        Args:
+            size_bytes: Size in bytes
+            
+        Returns:
+            Formatted size string (e.g., "2.5MB")
+        """
+        size = float(size_bytes)
+        for unit in ['B', 'KB', 'MB', 'GB']:
+            if size < 1024.0:
+                if unit == 'B':
+                    return f"{int(size)}{unit}"
+                return f"{size:.1f}{unit}"
+            size /= 1024.0
+        return f"{size:.1f}TB"
+    
     @property
     def name(self) -> str:
         """Get the file name."""
@@ -22,14 +42,7 @@ class File:
     @property
     def formatted_size(self) -> str:
         """Get human-readable file size."""
-        size = self.size_bytes
-        for unit in ['B', 'KB', 'MB', 'GB']:
-            if size < 1024.0:
-                if unit == 'B':
-                    return f"{size}{unit}"
-                return f"{size:.1f}{unit}"
-            size /= 1024.0
-        return f"{size:.1f}TB"
+        return self.format_file_size(self.size_bytes)
     
     def to_dict(self) -> dict:
         """Convert to dictionary for view layer."""

@@ -285,6 +285,97 @@ class TestDisplayMethods:
         assert "conversion complete" in text.lower()
         assert "1.23" in text
     
+    def test_show_conversion_summary(self):
+        """Test conversion summary display with different merge modes"""
+        console = Console(record=True)
+        ui = RetroCLI(console=console)
+        
+        # Test no_merge mode
+        ui.show_conversion_summary(
+            total_files=3,
+            output_count=3,
+            merge_mode="no_merge",
+            merged_filename=None,
+            total_runtime=45.67,
+            total_input_size_formatted="2.0MB"
+        )
+        
+        text = console.export_text()
+        assert "conversion complete" in text.lower()
+        assert "files processed:     3" in text
+        assert "output created:      3 files" in text
+        assert "total runtime:       45.67s" in text
+        assert "input size:          2.0MB" in text
+        
+        # Clear console for next test
+        console.clear()
+        
+        # Test merge mode
+        ui.show_conversion_summary(
+            total_files=2,
+            output_count=1,
+            merge_mode="merge",
+            merged_filename="combined.txt",
+            total_runtime=12.34,
+            total_input_size_formatted="1.0MB"
+        )
+        
+        text = console.export_text()
+        assert "output created:      1 merged file (combined.txt)" in text
+        assert "total runtime:       12.34s" in text
+        assert "input size:          1.0MB" in text
+        
+        # Clear console for next test
+        console.clear()
+        
+        # Test per_page mode
+        ui.show_conversion_summary(
+            total_files=1,
+            output_count=5,
+            merge_mode="per_page",
+            merged_filename=None,
+            total_runtime=8.90,
+            total_input_size_formatted="500.0KB"
+        )
+        
+        text = console.export_text()
+        assert "output created:      5 pages/chapters" in text
+        assert "total runtime:       8.90s" in text
+        assert "input size:          500.0KB" in text
+        
+        # Clear console for next test
+        console.clear()
+        
+        # Test edge cases for file size formatting
+        # Test bytes (B) unit
+        ui.show_conversion_summary(
+            total_files=1,
+            output_count=1,
+            merge_mode="no_merge",
+            merged_filename=None,
+            total_runtime=1.0,
+            total_input_size_formatted="512B"
+        )
+        
+        text = console.export_text()
+        assert "input size:          512B" in text
+        
+        # Clear console for next test
+        console.clear()
+        
+        # Test terabytes (TB) unit
+        ui.show_conversion_summary(
+            total_files=1,
+            output_count=1,
+            merge_mode="no_merge",
+            merged_filename=None,
+            total_runtime=1.0,
+            total_input_size_formatted="1.0TB"
+        )
+        
+        text = console.export_text()
+        assert "input size:          1.0TB" in text
+    
     def test_clear_and_show_header(self):
         """Test clear_and_show_header clears console and redraws header"""
         console = Console(record=True)
