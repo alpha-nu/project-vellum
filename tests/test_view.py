@@ -501,12 +501,13 @@ class TestUserInput:
     
     def test_get_user_input_valid(self, monkeypatch):
         """Test getting valid user input"""
-        inputs = iter(["test.pdf", "1"])
+        inputs = iter(["test.pdf"])
         
         console = Console(record=True)
         ui = RetroCLI(console=console)
         
         monkeypatch.setattr(ui, "input_center", lambda prompt=">>: ": next(inputs))
+        monkeypatch.setattr(ui, "_select_output_format", lambda: 1)
         monkeypatch.setattr(ui, "_select_merge_mode", lambda: "no_merge")
         
         path, format_choice, merge = ui.get_user_input()
@@ -517,12 +518,13 @@ class TestUserInput:
     
     def test_get_user_input_format_2(self, monkeypatch):
         """Test format choice 2 (markdown)"""
-        inputs = iter(["doc.epub", "2"])
+        inputs = iter(["doc.epub"])
         
         console = Console(record=True)
         ui = RetroCLI(console=console)
         
         monkeypatch.setattr(ui, "input_center", lambda prompt=">>: ": next(inputs))
+        monkeypatch.setattr(ui, "_select_output_format", lambda: 2)
         monkeypatch.setattr(ui, "_select_merge_mode", lambda: "merge")
         
         path, format_choice, merge = ui.get_user_input()
@@ -532,12 +534,13 @@ class TestUserInput:
     
     def test_get_user_input_format_3(self, monkeypatch):
         """Test format choice 3 (json)"""
-        inputs = iter(["/data", "3"])
+        inputs = iter(["/data"])
         
         console = Console(record=True)
         ui = RetroCLI(console=console)
         
         monkeypatch.setattr(ui, "input_center", lambda prompt=">>: ": next(inputs))
+        monkeypatch.setattr(ui, "_select_output_format", lambda: 3)
         monkeypatch.setattr(ui, "_select_merge_mode", lambda: "per_page")
         
         path, format_choice, merge = ui.get_user_input()
@@ -545,46 +548,15 @@ class TestUserInput:
         assert format_choice == 3
         assert merge == "per_page"
     
-    def test_get_user_input_invalid_format_retry(self, monkeypatch):
-        """Test invalid format choice with retry"""
-        inputs = iter(["test.pdf", "99", "1"])
-        
-        console = Console(record=True)
-        ui = RetroCLI(console=console)
-        
-        monkeypatch.setattr(ui, "input_center", lambda prompt=">>: ": next(inputs))
-        monkeypatch.setattr(ui, "_select_merge_mode", lambda: "no_merge")
-        
-        path, format_choice, merge = ui.get_user_input()
-        
-        assert format_choice == 1
-        
-        # Check error message was shown
-        text = console.export_text()
-        assert "enter 1, 2, or 3" in text.lower()
-    
-    def test_get_user_input_empty_format(self, monkeypatch):
-        """Test empty format input retries"""
-        inputs = iter(["test.pdf", "", "2"])
-        
-        console = Console(record=True)
-        ui = RetroCLI(console=console)
-        
-        monkeypatch.setattr(ui, "input_center", lambda prompt=">>: ": next(inputs))
-        monkeypatch.setattr(ui, "_select_merge_mode", lambda: "no_merge")
-        
-        path, format_choice, merge = ui.get_user_input()
-        
-        assert format_choice == 2
-    
     def test_get_user_input_merge_default(self, monkeypatch):
         """Test merge prompt returns no_merge by default"""
-        inputs = iter(["test.pdf", "1"])
+        inputs = iter(["test.pdf"])
         
         console = Console(record=True)
         ui = RetroCLI(console=console)
         
         monkeypatch.setattr(ui, "input_center", lambda prompt=">>: ": next(inputs))
+        monkeypatch.setattr(ui, "_select_output_format", lambda: 1)
         monkeypatch.setattr(ui, "_select_merge_mode", lambda: "no_merge")
         
         path, format_choice, merge = ui.get_user_input()
@@ -593,12 +565,13 @@ class TestUserInput:
     
     def test_get_user_input_merge_no(self, monkeypatch):
         """Test merge mode selection returns no_merge"""
-        inputs = iter(["test.pdf", "1"])
+        inputs = iter(["test.pdf"])
         
         console = Console(record=True)
         ui = RetroCLI(console=console)
         
         monkeypatch.setattr(ui, "input_center", lambda prompt=">>: ": next(inputs))
+        monkeypatch.setattr(ui, "_select_output_format", lambda: 1)
         monkeypatch.setattr(ui, "_select_merge_mode", lambda: "no_merge")
         
         path, format_choice, merge = ui.get_user_input()
@@ -607,12 +580,13 @@ class TestUserInput:
     
     def test_get_user_input_merge_per_page(self, monkeypatch):
         """Test merge mode selection returns per_page"""
-        inputs = iter(["test.pdf", "1"])
+        inputs = iter(["test.pdf"])
         
         console = Console(record=True)
         ui = RetroCLI(console=console)
         
         monkeypatch.setattr(ui, "input_center", lambda prompt=">>: ": next(inputs))
+        monkeypatch.setattr(ui, "_select_output_format", lambda: 1)
         monkeypatch.setattr(ui, "_select_merge_mode", lambda: "per_page")
         
         path, format_choice, merge = ui.get_user_input()
@@ -731,3 +705,58 @@ class TestMergeModeSelection:
         
         result = ui._select_merge_mode()
         assert result == "per_page"
+
+class TestOutputFormatSelection:
+    """Test output format selection UI"""
+    
+    def test_select_output_format_navigation(self, monkeypatch):
+        """Test _select_output_format with arrow key navigation"""
+        console = Console(record=True)
+        ui = RetroCLI(console=console)
+        
+        # Simulate: down arrow, down arrow, enter (selects json = 3)
+        key_sequence = [
+            "\x1b", "[", "B",  # Down arrow
+            "\x1b", "[", "B",  # Down arrow
+            "\r"               # Enter
+        ]
+        key_iter = iter(key_sequence)
+        
+        import readchar
+        monkeypatch.setattr(readchar, "readchar", lambda: next(key_iter))
+        
+        result = ui._select_output_format()
+        assert result == 3
+    
+    def test_select_output_format_up_arrow_wrapping(self, monkeypatch):
+        """Test _select_output_format with up arrow wrapping to end"""
+        console = Console(record=True)
+        ui = RetroCLI(console=console)
+        
+        # Simulate: up arrow (wraps to json), enter
+        key_sequence = [
+            "\x1b", "[", "A",  # Up arrow (wraps to json)
+            "\r"               # Enter
+        ]
+        key_iter = iter(key_sequence)
+        
+        import readchar
+        monkeypatch.setattr(readchar, "readchar", lambda: next(key_iter))
+        
+        result = ui._select_output_format()
+        assert result == 3
+    
+    def test_select_output_format_default_selection(self, monkeypatch):
+        """Test _select_output_format with immediate enter (selects plain text = 1)"""
+        console = Console(record=True)
+        ui = RetroCLI(console=console)
+        
+        # Simulate: enter (selects default plain text)
+        key_sequence = ["\r"]
+        key_iter = iter(key_sequence)
+        
+        import readchar
+        monkeypatch.setattr(readchar, "readchar", lambda: next(key_iter))
+        
+        result = ui._select_output_format()
+        assert result == 1

@@ -92,3 +92,5 @@ docker run -it -v "/path/to/docs:/data" vellum-converter
 ## Good Agent Practices
 1. ALWAYS run tests after changes you make
 2. ALWAYS make sure the README.md is in sync with every new feature you implement.
+3. ALWAYS check test coverage after changes and ensure it never decreases from the current baseline. If coverage drops, add tests to cover the uncovered lines or refactor to maintain coverage.
+4. When adding new interactive UI methods that use readchar for input, ensure they are properly tested with mocked input to maintain coverage.

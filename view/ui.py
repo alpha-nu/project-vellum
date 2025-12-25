@@ -183,6 +183,8 @@ class RetroCLI(UIInterface):
 
             table = Table(
                 title=f"[{self.colors['primary']}]select files for conversion[/]",
+                title_justify="left",
+                title_style="",
                 show_header=False,
                 width=table_width,
                 border_style=self.colors["subtle"],
@@ -259,32 +261,84 @@ class RetroCLI(UIInterface):
         self.print_center(path_prompt)
         path_str = self.input_center()
 
-        format_prompt = Panel(
-            (f"[{self.colors['primary']}]select output format[/]\n\n"
-             f"[{self.colors['subtle']}][1][/] [{self.colors["secondary"]}]plain text[/]\n"
-             f"[{self.colors['subtle']}][2][/] [{self.colors["secondary"]}]markdown[/]\n"
-             f"[{self.colors['subtle']}][3][/] [{self.colors["secondary"]}]json[/]"),
-            border_style=self.colors["subtle"],
-            width=min(self.max_width, self.console.size.width),
-        )
-        self.print_center(format_prompt)
-        while True:
-            resp = self.input_center()
-            if resp and resp.strip() in ("1", "2", "3"):
-                format_choice = int(resp.strip())
-                break
-            self.print_center(
-                Panel(
-                    f"[{self.colors['error']}]please enter 1, 2, or 3[/]",
-                    border_style=self.colors["subtle"],
-                    width=min(self.max_width, self.console.size.width),
-                )
-            )
+        # Output format selection menu
+        format_choice = self._select_output_format()
 
         # Merge mode selection menu
         merge_choice = self._select_merge_mode()
 
         return path_str, format_choice, merge_choice
+
+    def _select_output_format(self) -> int:
+        """
+        Interactive output format selection menu with radio button options.
+        
+        Returns:
+            Format choice: 1 for plain text, 2 for markdown, 3 for json
+        """
+        options = [
+            ("plain text", "(.txt)"),
+            ("markdown", "(.md)"),
+            ("json", "(.json)"),
+        ]
+        current_index = 0  # Default to plain text
+        
+        while True:
+            self.console.clear()
+            self.draw_header()
+
+            panel_width = min(self.max_width, self.console.size.width)
+            table_width = panel_width - 4
+
+            table = Table(
+                title=f"[{self.colors['primary']}]select output format[/]",
+                title_justify="left",
+                title_style="",
+                show_header=False,
+                width=table_width,
+                border_style=self.colors["subtle"],
+            )
+            table.add_column("option", style=self.colors["subtle"])
+
+            for i, (name, hint) in enumerate(options):
+                # Radio button: filled if selected, empty if not
+                if i == current_index:
+                    radio = f"[{self.colors['secondary']}]●[/]"
+                    option_text = f"[{self.colors['secondary']}]{name}[/] [{self.colors['secondary']}]{hint}[/]"
+                else:
+                    radio = "○"
+                    option_text = f"[{self.colors['primary']}]{name}[/] {hint}"
+                marker = f"[{self.colors['secondary']}]►[/]" if i == current_index else " "
+                table.add_row(f"{marker} {radio} {option_text}")
+
+            self.print_center(
+                Panel(
+                    table,
+                    border_style=self.colors["subtle"],
+                    width=panel_width,
+                )
+            )
+            self.print_center(
+                Panel(
+                    f"[{self.colors['primary']}][{self.colors['secondary']}]⬆︎ /⬇︎[/] :navigate  [{self.colors['secondary']}][ENTER][/]:confirm[/]",
+                    border_style=self.colors["subtle"],
+                    width=panel_width,
+                )
+            )
+
+            key = readchar.readchar()
+
+            if key == "\x1b":
+                next1 = readchar.readchar()
+                next2 = readchar.readchar()
+                if next1 == "[":
+                    if next2 == "A":
+                        current_index = (current_index - 1) % len(options)
+                    elif next2 == "B":
+                        current_index = (current_index + 1) % len(options)
+            elif key in ("\r", "\n"):
+                # Enter confirms the current selection
+                return current_index + 1
 
     def _select_merge_mode(self) -> str:
         """
@@ -309,6 +363,8 @@ class RetroCLI(UIInterface):
 
             table = Table(
                 title=f"[{self.colors['primary']}]select merge mode[/]",
+                title_justify="left",
+                title_style="",
                 show_header=False,
                 width=table_width,
                 border_style=self.colors["subtle"],
