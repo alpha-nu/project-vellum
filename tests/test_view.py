@@ -12,6 +12,7 @@ from view.ui import (
     StyledDescriptionColumn,
     _StyledTimeMixin,
 )
+from view.ui import MergeMode
 
 
 class TestRetroCLIBasics:
@@ -273,7 +274,7 @@ class TestDisplayMethods:
         ui.show_conversion_summary(
             total_files=3,
             output_count=3,
-            merge_mode="no_merge",
+            merge_mode=MergeMode.NO_MERGE,
             merged_filename=None,
             total_runtime=45.67,
             total_input_size_formatted="2.0MB",
@@ -297,7 +298,7 @@ class TestDisplayMethods:
         ui.show_conversion_summary(
             total_files=2,
             output_count=1,
-            merge_mode="merge",
+            merge_mode=MergeMode.MERGE,
             merged_filename="combined.txt",
             total_runtime=12.34,
             total_input_size_formatted="1.0MB",
@@ -316,7 +317,7 @@ class TestDisplayMethods:
         ui.show_conversion_summary(
             total_files=1,
             output_count=5,
-            merge_mode="per_page",
+            merge_mode=MergeMode.PER_PAGE,
             merged_filename=None,
             total_runtime=8.90,
             total_input_size_formatted="500.0KB",
@@ -612,13 +613,14 @@ class TestUserInput:
         
         monkeypatch.setattr(ui, "input_center", lambda prompt=">>: ": next(inputs))
         monkeypatch.setattr(ui, "_select_output_format", lambda: 1)
-        monkeypatch.setattr(ui, "_select_merge_mode", lambda: "no_merge")
+        monkeypatch.setattr(ui, "_select_merge_mode", lambda: MergeMode.NO_MERGE)
         
-        path, format_choice, merge = ui.get_user_input()
+        path, format_choice, merge, merged_filename = ui.get_user_input()
         
         assert path == "test.pdf"
         assert format_choice == 1
-        assert merge == "no_merge"
+        assert merge == MergeMode.NO_MERGE
+        assert merged_filename is None
     
     def test_get_user_input_format_2(self, monkeypatch):
         """Test format choice 2 (markdown)"""
@@ -629,12 +631,14 @@ class TestUserInput:
         
         monkeypatch.setattr(ui, "input_center", lambda prompt=">>: ": next(inputs))
         monkeypatch.setattr(ui, "_select_output_format", lambda: 2)
-        monkeypatch.setattr(ui, "_select_merge_mode", lambda: "merge")
+        monkeypatch.setattr(ui, "_select_merge_mode", lambda: MergeMode.MERGE)
+        monkeypatch.setattr(ui, "_prompt_merged_filename", lambda: "my_merged")
         
-        path, format_choice, merge = ui.get_user_input()
+        path, format_choice, merge, merged_filename = ui.get_user_input()
         
         assert format_choice == 2
-        assert merge == "merge"
+        assert merge == MergeMode.MERGE
+        assert merged_filename == "my_merged"
     
     def test_get_user_input_format_3(self, monkeypatch):
         """Test format choice 3 (json)"""
@@ -645,12 +649,13 @@ class TestUserInput:
         
         monkeypatch.setattr(ui, "input_center", lambda prompt=">>: ": next(inputs))
         monkeypatch.setattr(ui, "_select_output_format", lambda: 3)
-        monkeypatch.setattr(ui, "_select_merge_mode", lambda: "per_page")
+        monkeypatch.setattr(ui, "_select_merge_mode", lambda: MergeMode.PER_PAGE)
         
-        path, format_choice, merge = ui.get_user_input()
+        path, format_choice, merge, merged_filename = ui.get_user_input()
         
         assert format_choice == 3
-        assert merge == "per_page"
+        assert merge == MergeMode.PER_PAGE
+        assert merged_filename is None
     
     def test_get_user_input_merge_default(self, monkeypatch):
         """Test merge prompt returns no_merge by default"""
@@ -661,11 +666,12 @@ class TestUserInput:
         
         monkeypatch.setattr(ui, "input_center", lambda prompt=">>: ": next(inputs))
         monkeypatch.setattr(ui, "_select_output_format", lambda: 1)
-        monkeypatch.setattr(ui, "_select_merge_mode", lambda: "no_merge")
+        monkeypatch.setattr(ui, "_select_merge_mode", lambda: MergeMode.NO_MERGE)
         
-        path, format_choice, merge = ui.get_user_input()
+        path, format_choice, merge, merged_filename = ui.get_user_input()
         
-        assert merge == "no_merge"
+        assert merge == MergeMode.NO_MERGE
+        assert merged_filename is None
     
     def test_get_user_input_merge_no(self, monkeypatch):
         """Test merge mode selection returns no_merge"""
@@ -676,11 +682,12 @@ class TestUserInput:
         
         monkeypatch.setattr(ui, "input_center", lambda prompt=">>: ": next(inputs))
         monkeypatch.setattr(ui, "_select_output_format", lambda: 1)
-        monkeypatch.setattr(ui, "_select_merge_mode", lambda: "no_merge")
+        monkeypatch.setattr(ui, "_select_merge_mode", lambda: MergeMode.NO_MERGE)
         
-        path, format_choice, merge = ui.get_user_input()
+        path, format_choice, merge, merged_filename = ui.get_user_input()
         
-        assert merge == "no_merge"
+        assert merge == MergeMode.NO_MERGE
+        assert merged_filename is None
     
     def test_get_user_input_merge_per_page(self, monkeypatch):
         """Test merge mode selection returns per_page"""
@@ -691,11 +698,23 @@ class TestUserInput:
         
         monkeypatch.setattr(ui, "input_center", lambda prompt=">>: ": next(inputs))
         monkeypatch.setattr(ui, "_select_output_format", lambda: 1)
-        monkeypatch.setattr(ui, "_select_merge_mode", lambda: "per_page")
+        monkeypatch.setattr(ui, "_select_merge_mode", lambda: MergeMode.PER_PAGE)
         
-        path, format_choice, merge = ui.get_user_input()
+        path, format_choice, merge, merged_filename = ui.get_user_input()
         
-        assert merge == "per_page"
+        assert merge == MergeMode.PER_PAGE
+        assert merged_filename is None
+
+    def test_prompt_merged_filename(self, monkeypatch):
+        """Test prompting for merged filename"""
+        console = Console(record=True)
+        ui = RetroCLI(console=console)
+        
+        monkeypatch.setattr(ui, "input_center", lambda prompt=">>: ": "  my_file  ")
+        
+        filename = ui._prompt_merged_filename()
+        
+        assert filename == "my_file"
 
 
 class TestProgressBar:
@@ -788,7 +807,7 @@ class TestMergeModeSelection:
         monkeypatch.setattr(readchar, "readchar", lambda: next(key_iter))
         
         result = ui._select_merge_mode()
-        assert result == "per_page"
+        assert result == MergeMode.PER_PAGE
     
     def test_select_merge_mode_up_arrow_wrapping(self, monkeypatch):
         """Test _select_merge_mode with up arrow wrapping to end"""
@@ -806,7 +825,7 @@ class TestMergeModeSelection:
         monkeypatch.setattr(readchar, "readchar", lambda: next(key_iter))
         
         result = ui._select_merge_mode()
-        assert result == "per_page"
+        assert result == MergeMode.PER_PAGE
 
 class TestOutputFormatSelection:
     """Test output format selection UI"""

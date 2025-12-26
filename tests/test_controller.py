@@ -1,6 +1,7 @@
 from pathlib import Path
 from unittest.mock import Mock
 from controller.converter_controller import ConverterController
+from view.ui import MergeMode
 
 
 class FakeUI:
@@ -20,8 +21,8 @@ class FakeUI:
         pass
 
     def get_user_input(self):
-        # return path_str, format_choice(1=plain), merge_mode("no_merge")
-        return str(self._tmp), 1, "no_merge"
+        # return path_str, format_choice(1=plain), merge_mode("no_merge"), merged_filename
+        return str(self._tmp), 1, MergeMode.NO_MERGE, None
 
     def select_files(self, file_data):
         # Return all indices (select all files)
@@ -137,7 +138,7 @@ def test_controller_directory_mode(tmp_path, monkeypatch):
             self.selected = []
         
         def get_user_input(self):
-            return str(self._tmp), 1, False
+            return str(self._tmp), 1, MergeMode.NO_MERGE, None
         
         def select_files(self, file_data):
             self.selected = file_data
@@ -170,7 +171,7 @@ def test_controller_merge_mode(tmp_path, monkeypatch):
             super().__init__(directory)
         
         def get_user_input(self):
-            return str(self._tmp), 1, "merge"  # Enable merge
+            return str(self._tmp), 1, MergeMode.MERGE, None  # Enable merge
         
         def select_files(self, file_data):
             return list(range(len(file_data)))
@@ -186,6 +187,40 @@ def test_controller_merge_mode(tmp_path, monkeypatch):
     
     # Check merged file was created
     merged_file = tmp_path / "merged_output.txt"
+    assert merged_file.exists()
+    content = merged_file.read_text()
+    assert "file1.pdf" in content
+    assert "file2.pdf" in content
+
+
+def test_controller_merge_custom_filename(tmp_path, monkeypatch):
+    """Test controller with merge enabled and custom filename"""
+    file1 = tmp_path / "file1.pdf"
+    file2 = tmp_path / "file2.pdf"
+    file1.write_text("content1")
+    file2.write_text("content2")
+    
+    class MergeUI(FakeUI):
+        def __init__(self, directory):
+            super().__init__(directory)
+        
+        def get_user_input(self):
+            return str(self._tmp), 1, MergeMode.MERGE, "my_custom_merge"  # Enable merge with custom name
+        
+        def select_files(self, file_data):
+            return list(range(len(file_data)))
+    
+    monkeypatch.setattr(
+        "controller.converter_controller.ConverterController.get_converter",
+        lambda self, p: FakeConverter(p)
+    )
+    
+    ui = MergeUI(tmp_path)
+    controller = ConverterController(ui)
+    controller.run()
+    
+    # Check merged file was created with custom name
+    merged_file = tmp_path / "my_custom_merge.txt"
     assert merged_file.exists()
     content = merged_file.read_text()
     assert "file1.pdf" in content
@@ -255,7 +290,7 @@ def test_controller_different_formats(tmp_path, monkeypatch):
     for format_choice, expected_ext in [(1, ".txt"), (2, ".md"), (3, ".json")]:
         class FormatUI(FakeUI):
             def get_user_input(self):
-                return str(test_file), format_choice, "no_merge"
+                return str(test_file), format_choice, MergeMode.NO_MERGE, None
         
         ui = FormatUI(test_file)
         controller = ConverterController(ui)
@@ -332,7 +367,7 @@ class TestControllerEdgeCases:
                 super().__init__(file)
             
             def get_user_input(self):
-                return str(self._tmp), 1, "no_merge"
+                return str(self._tmp), 1, MergeMode.NO_MERGE, None
         
         ui = TestUI(test_file)
         controller = ConverterController(ui)
@@ -371,7 +406,7 @@ class TestControllerEdgeCases:
                 super().__init__(file)
             
             def get_user_input(self):
-                return str(test_file), 1, "merge"
+                return str(test_file), 1, MergeMode.MERGE, None
         
         monkeypatch.setattr(
             "controller.converter_controller.ConverterController.get_converter",
@@ -436,7 +471,7 @@ class TestControllerPerPageMode:
                 pass
             
             def get_user_input(self):
-                return str(test_file), 1, "per_page"
+                return str(test_file), 1, MergeMode.PER_PAGE, None
             
             def select_files(self, file_data):
                 return list(range(len(file_data)))
@@ -520,7 +555,7 @@ class TestControllerPerPageMode:
                 pass
             
             def get_user_input(self):
-                return str(test_file), 1, "no_merge"
+                return str(test_file), 1, MergeMode.NO_MERGE, None
             
             def select_files(self, file_data):
                 return list(range(len(file_data)))

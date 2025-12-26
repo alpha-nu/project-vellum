@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import List, Optional
 import time
 from view.interface import UIInterface
+from view.ui import MergeMode
 from model.converters import PDFConverter, EPubConverter
 from model.outputs import PlainTextHandler, MarkdownHandler, JSONHandler, OutputHandler
 from model.file import File
@@ -94,7 +95,7 @@ class ConverterController:
         self.ui.draw_header()
 
         # Get user input
-        input_str, format_choice, merge_mode = self.ui.get_user_input()
+        input_str, format_choice, merge_mode, merged_filename = self.ui.get_user_input()
         input_path = Path(input_str)
 
         # Validate path
@@ -123,9 +124,9 @@ class ConverterController:
         accumulator, output_count, total_output_size = self._process_files(files, handler, merge_mode)
 
         # Handle output based on merge mode
-        merged_filename = None
-        if merge_mode == "merge" and accumulator:
-            merged_filename, merge_output_size = self._save_merged_output(input_path, handler, accumulator)
+        merged_output_filename = None
+        if merge_mode == MergeMode.MERGE and accumulator:
+            merged_output_filename, merge_output_size = self._save_merged_output(input_path, handler, accumulator, merged_filename)
             total_output_size += merge_output_size
             output_count = 1  # Override with 1 for merged output
 
@@ -135,7 +136,7 @@ class ConverterController:
             total_files=len(files),
             output_count=output_count,
             merge_mode=merge_mode,
-            merged_filename=merged_filename,
+            merged_filename=merged_output_filename,
             total_runtime=elapsed,
             total_input_size_formatted=File.format_file_size(total_input_size),
             total_output_size_formatted=File.format_file_size(total_output_size)
@@ -185,7 +186,7 @@ class ConverterController:
             
         Returns:
             Tuple of (accumulator, output_count, total_output_size)
-            - accumulator: List of accumulated content (empty unless merge_mode == "merge")
+            - accumulator: List of accumulated content (empty unless merge_mode == MergeMode.MERGE)
             - output_count: Number of output files/pages/chapters created
             - total_output_size: Total size of all output files created
         """
@@ -217,7 +218,7 @@ class ConverterController:
                 output_count += file_output_count
                 total_output_size += file_output_size
                 
-                if content and merge_mode == "merge":
+                if content and merge_mode == MergeMode.MERGE:
                     accumulator.append(
                         f"\n--- start source: {file.name} ---\n{content}"
                     )
@@ -244,7 +245,7 @@ class ConverterController:
             
         Returns:
             Tuple of (content, output_count, output_size)
-            - content: Extracted content if merge_mode == "merge", None otherwise
+            - content: Extracted content if merge_mode == MergeMode.MERGE, None otherwise
             - output_count: Number of output files/pages/chapters created for this file
             - output_size: Total size of output files created for this file
         """
@@ -281,7 +282,7 @@ class ConverterController:
         # Extract and save based on merge mode
         output_count = 0
         output_size = 0
-        if merge_mode == "per_page":
+        if merge_mode == MergeMode.PER_PAGE:
             # Per-page output: extract and save individual pages as separate files
             contents = converter.extract_content_per_item(progress_callback=progress_callback)
             output_size = handler.save_multiple(contents, file, file.name)
@@ -292,11 +293,11 @@ class ConverterController:
             content = converter.extract_content(progress_callback=progress_callback)
             
             # Save based on merge mode
-            if merge_mode == "no_merge":
+            if merge_mode == MergeMode.NO_MERGE:
                 # Save as single file (existing behavior)
                 output_size = handler.save(content, file)
                 output_count = 1  # One output file per input file
-            # If merge_mode == "merge", don't save now, will be merged later
+            # If merge_mode == MergeMode.MERGE, don't save now, will be merged later
             # output_count will be set to 1 later for the merged file
         
         # Mark as complete
@@ -315,7 +316,8 @@ class ConverterController:
         self, 
         input_path: Path, 
         handler: OutputHandler, 
-        accumulator: List[str]
+        accumulator: List[str],
+        merged_filename: Optional[str] = None
     ) -> tuple[str, int]:
         """
         Save merged output to single file.
@@ -324,13 +326,16 @@ class ConverterController:
             input_path: Original input path
             handler: Output format handler
             accumulator: List of content strings to merge
+            merged_filename: Optional custom filename for the merged output (without extension)
             
         Returns:
             Tuple of (filename, output_size)
             - filename: Name of the merged output file
             - output_size: Size of the merged output file
         """
-        if input_path.is_dir():
+        if merged_filename:
+            output_name = input_path / merged_filename if input_path.is_dir() else input_path.with_name(merged_filename)
+        elif input_path.is_dir():
             output_name = input_path / "merged_output"
         else:
             output_name = input_path.with_name(f"{input_path.stem}_merged")

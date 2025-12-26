@@ -14,8 +14,15 @@ from rich.align import Align
 import readchar
 from pathlib import Path
 from typing import Optional
+from enum import Enum
 from view.interface import UIInterface
 from view.keyboard import KeyboardKey, read_keyboard_key
+
+
+class MergeMode(Enum):
+    NO_MERGE = "no_merge"
+    MERGE = "merge"
+    PER_PAGE = "per_page"
 
 
 class _StyledTimeMixin:
@@ -265,7 +272,10 @@ class RetroCLI(UIInterface):
         # Merge mode selection menu
         merge_choice = self._select_merge_mode()
 
-        return path_str, format_choice, merge_choice
+        # If merge mode selected, prompt for filename
+        merged_filename = self._prompt_merged_filename() if merge_choice == MergeMode.MERGE else None
+
+        return path_str, format_choice, merge_choice, merged_filename
 
     def _select_output_format(self) -> int:
         """
@@ -334,17 +344,17 @@ class RetroCLI(UIInterface):
                 # Enter confirms the current selection
                 return current_index + 1
 
-    def _select_merge_mode(self) -> str:
+    def _select_merge_mode(self) -> MergeMode:
         """
         Interactive merge mode selection menu with radio button options.
         
         Returns:
-            One of: "no_merge", "merge", "per_page"
+            One of: MergeMode.NO_MERGE, MergeMode.MERGE, MergeMode.PER_PAGE
         """
         options = [
-            ("no_merge", "no merge", "(separate file per document)"),
-            ("merge", "merge", "(combine all into single file)"),
-            ("per_page", "file per page", "(one file per page/chapter)"),
+            (MergeMode.NO_MERGE, "no merge", "(separate file per document)"),
+            (MergeMode.MERGE, "merge", "(combine all into single file)"),
+            (MergeMode.PER_PAGE, "file per page", "(one file per page/chapter)"),
         ]
         current_index = 0  # Default to "no_merge"
         
@@ -365,7 +375,7 @@ class RetroCLI(UIInterface):
             )
             table.add_column("option", style=self.colors["subtle"])
 
-            for i, (key, name, hint) in enumerate(options):
+            for i, (_, name, hint) in enumerate(options):
                 # Radio button: filled if selected, empty if not
                 if i == current_index:
                     radio = f"[{self.colors['secondary']}]●[/]"
@@ -400,6 +410,27 @@ class RetroCLI(UIInterface):
             elif token.key == KeyboardKey.ENTER:
                 # Enter confirms the current selection
                 return options[current_index][0]
+
+    def _prompt_merged_filename(self) -> str:
+        """
+        Prompt user for the name of the merged output file.
+        
+        Returns:
+            The filename entered by the user
+        """
+        self.console.clear()
+        self.draw_header()
+
+        panel_width = min(self.max_width, self.console.size.width)
+        prompt_panel = Panel(
+            f"[{self.colors['primary']}]enter name for merged output file[/] [{self.colors['secondary']}](without extension)[/]",
+            border_style=self.colors["subtle"],
+            width=panel_width,
+        )
+        self.print_center(prompt_panel)
+        filename = self.input_center()
+        return filename.strip()
+
     def get_progress_bar(self):
         @contextmanager
         def _progress_ctx():
@@ -458,11 +489,11 @@ class RetroCLI(UIInterface):
         runtime_str = f"{total_runtime:.2f}s"
         
         # Determine output description based on merge mode
-        if merge_mode == "merge":
+        if merge_mode == MergeMode.MERGE:
             output_desc = f"1 merged file"
             if merged_filename:
                 output_desc += f" ({merged_filename})"
-        elif merge_mode == "per_page":
+        elif merge_mode == MergeMode.PER_PAGE:
             output_desc = f"{output_count} pages/chapters"
         else:  # no_merge
             output_desc = f"{output_count} files"
