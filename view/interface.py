@@ -61,7 +61,8 @@ class UIInterface(ABC):
         merged_filename: Optional[str], 
         total_runtime: float, 
         total_input_size_formatted: str,
-        total_output_size_formatted: str
+        total_output_size_formatted: str,
+        single_output_filename: Optional[str] = None
     ):
         """Display comprehensive conversion summary and completion message.
         

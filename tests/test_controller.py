@@ -1,7 +1,7 @@
 from pathlib import Path
 from unittest.mock import Mock
 from controller.converter_controller import ConverterController
-from view.ui import MergeMode
+from view.ui import MergeMode, OutputFormat
 
 
 class FakeUI:
@@ -21,8 +21,8 @@ class FakeUI:
         pass
 
     def get_user_input(self):
-        # return path_str, format_choice(1=plain), merge_mode("no_merge"), merged_filename
-        return str(self._tmp), 1, MergeMode.NO_MERGE, None
+        # return path_str, format_choice, merge_mode, merged_filename
+        return str(self._tmp), OutputFormat.PLAIN_TEXT, MergeMode.NO_MERGE, None
 
     def select_files(self, file_data):
         # Return all indices (select all files)
@@ -138,7 +138,7 @@ def test_controller_directory_mode(tmp_path, monkeypatch):
             self.selected = []
         
         def get_user_input(self):
-            return str(self._tmp), 1, MergeMode.NO_MERGE, None
+            return str(self._tmp), OutputFormat.PLAIN_TEXT, MergeMode.NO_MERGE, None
         
         def select_files(self, file_data):
             self.selected = file_data
@@ -171,7 +171,7 @@ def test_controller_merge_mode(tmp_path, monkeypatch):
             super().__init__(directory)
         
         def get_user_input(self):
-            return str(self._tmp), 1, MergeMode.MERGE, None  # Enable merge
+            return str(self._tmp), OutputFormat.PLAIN_TEXT, MergeMode.MERGE, None  # Enable merge
         
         def select_files(self, file_data):
             return list(range(len(file_data)))
@@ -205,7 +205,7 @@ def test_controller_merge_custom_filename(tmp_path, monkeypatch):
             super().__init__(directory)
         
         def get_user_input(self):
-            return str(self._tmp), 1, MergeMode.MERGE, "my_custom_merge"  # Enable merge with custom name
+            return str(self._tmp), OutputFormat.PLAIN_TEXT, MergeMode.MERGE, "my_custom_merge"  # Enable merge with custom name
         
         def select_files(self, file_data):
             return list(range(len(file_data)))
@@ -287,10 +287,10 @@ def test_controller_different_formats(tmp_path, monkeypatch):
     )
     
     # Test each format
-    for format_choice, expected_ext in [(1, ".txt"), (2, ".md"), (3, ".json")]:
+    for fmt, expected_ext in [(OutputFormat.PLAIN_TEXT, ".txt"), (OutputFormat.MARKDOWN, ".md"), (OutputFormat.JSON, ".json")]:
         class FormatUI(FakeUI):
             def get_user_input(self):
-                return str(test_file), format_choice, MergeMode.NO_MERGE, None
+                return str(test_file), fmt, MergeMode.NO_MERGE, None
         
         ui = FormatUI(test_file)
         controller = ConverterController(ui)
@@ -367,7 +367,7 @@ class TestControllerEdgeCases:
                 super().__init__(file)
             
             def get_user_input(self):
-                return str(self._tmp), 1, MergeMode.NO_MERGE, None
+                return str(self._tmp), OutputFormat.PLAIN_TEXT, MergeMode.NO_MERGE, None
         
         ui = TestUI(test_file)
         controller = ConverterController(ui)
@@ -406,7 +406,7 @@ class TestControllerEdgeCases:
                 super().__init__(file)
             
             def get_user_input(self):
-                return str(test_file), 1, MergeMode.MERGE, None
+                return str(test_file), OutputFormat.PLAIN_TEXT, MergeMode.MERGE, None
         
         monkeypatch.setattr(
             "controller.converter_controller.ConverterController.get_converter",
@@ -414,7 +414,7 @@ class TestControllerEdgeCases:
         )
         monkeypatch.setattr(
             "controller.converter_controller.ConverterController.FORMAT_HANDLERS",
-            {1: MockHandler(), 2: MockHandler(), 3: MockHandler()}
+            {OutputFormat.PLAIN_TEXT: MockHandler(), OutputFormat.MARKDOWN: MockHandler(), OutputFormat.JSON: MockHandler()}
         )
         
         ui = TestUI(test_file)
@@ -555,7 +555,7 @@ class TestControllerPerPageMode:
                 pass
             
             def get_user_input(self):
-                return str(test_file), 1, MergeMode.NO_MERGE, None
+                return str(test_file), OutputFormat.PLAIN_TEXT, MergeMode.NO_MERGE, None
             
             def select_files(self, file_data):
                 return list(range(len(file_data)))
@@ -597,7 +597,7 @@ class TestControllerPerPageMode:
         )
         monkeypatch.setattr(
             "controller.converter_controller.ConverterController.FORMAT_HANDLERS",
-            {1: PlainTextHandler(), 2: PlainTextHandler(), 3: PlainTextHandler()}
+            {OutputFormat.PLAIN_TEXT: PlainTextHandler(), OutputFormat.MARKDOWN: PlainTextHandler(), OutputFormat.JSON: PlainTextHandler()}
         )
         
         ui = TestUI()

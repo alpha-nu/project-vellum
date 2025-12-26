@@ -25,6 +25,28 @@ class MergeMode(Enum):
     PER_PAGE = "per_page"
 
 
+class OutputFormat(Enum):
+    PLAIN_TEXT = "txt"
+    MARKDOWN = "md"
+    JSON = "json"
+    
+    @property
+    def extension(self) -> str:
+        return f".{self.value}"
+    
+    @property
+    def display_name(self) -> str:
+        return {
+            OutputFormat.PLAIN_TEXT: "plain text",
+            OutputFormat.MARKDOWN: "markdown",
+            OutputFormat.JSON: "json"
+        }[self]
+    
+    @property
+    def display_hint(self) -> str:
+        return f"({self.extension})"
+
+
 class _StyledTimeMixin:
     def __init__(self, style: str, attr: str):
         super().__init__()
@@ -277,17 +299,17 @@ class RetroCLI(UIInterface):
 
         return path_str, format_choice, merge_choice, merged_filename
 
-    def _select_output_format(self) -> int:
+    def _select_output_format(self) -> OutputFormat:
         """
         Interactive output format selection menu with radio button options.
         
         Returns:
-            Format choice: 1 for plain text, 2 for markdown, 3 for json
+            Selected OutputFormat enum value
         """
         options = [
-            ("plain text", "(.txt)"),
-            ("markdown", "(.md)"),
-            ("json", "(.json)"),
+            OutputFormat.PLAIN_TEXT,
+            OutputFormat.MARKDOWN,
+            OutputFormat.JSON,
         ]
         current_index = 0  # Default to plain text
         
@@ -308,14 +330,14 @@ class RetroCLI(UIInterface):
             )
             table.add_column("option", style=self.colors["subtle"])
 
-            for i, (name, hint) in enumerate(options):
+            for i, fmt in enumerate(options):
                 # Radio button: filled if selected, empty if not
                 if i == current_index:
                     radio = f"[{self.colors['secondary']}]●[/]"
-                    option_text = f"[{self.colors['secondary']}]{name}[/] [{self.colors['secondary']}]{hint}[/]"
+                    option_text = f"[{self.colors['secondary']}]{fmt.display_name}[/] [{self.colors['secondary']}]{fmt.display_hint}[/]"
                 else:
                     radio = "○"
-                    option_text = f"[{self.colors['primary']}]{name}[/] {hint}"
+                    option_text = f"[{self.colors['primary']}]{fmt.display_name}[/] {fmt.display_hint}"
                 marker = f"[{self.colors['secondary']}]►[/]" if i == current_index else " "
                 table.add_row(f"{marker} {radio} {option_text}")
 
@@ -342,7 +364,7 @@ class RetroCLI(UIInterface):
                 current_index = (current_index + 1) % len(options)
             elif token.key == KeyboardKey.ENTER:
                 # Enter confirms the current selection
-                return current_index + 1
+                return options[current_index]
 
     def _select_merge_mode(self) -> MergeMode:
         """
@@ -478,11 +500,12 @@ class RetroCLI(UIInterface):
         self, 
         total_files: int, 
         output_count: int, 
-        merge_mode: str, 
+        merge_mode: MergeMode, 
         merged_filename: Optional[str], 
         total_runtime: float, 
         total_input_size_formatted: str,
-        total_output_size_formatted: str
+        total_output_size_formatted: str,
+        single_output_filename: Optional[str] = None
     ):
         """Display comprehensive conversion summary and completion message."""
         # Format runtime
@@ -496,7 +519,10 @@ class RetroCLI(UIInterface):
         elif merge_mode == MergeMode.PER_PAGE:
             output_desc = f"{output_count} pages/chapters"
         else:  # no_merge
-            output_desc = f"{output_count} files"
+            if single_output_filename:
+                output_desc = single_output_filename
+            else:
+                output_desc = f"{output_count} files"
         
         content = (
             f"[{self.colors['confirm']}]conversion complete[/]\n\n"

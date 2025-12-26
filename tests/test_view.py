@@ -12,7 +12,7 @@ from view.ui import (
     StyledDescriptionColumn,
     _StyledTimeMixin,
 )
-from view.ui import MergeMode
+from view.ui import MergeMode, OutputFormat
 
 
 class TestRetroCLIBasics:
@@ -363,6 +363,25 @@ class TestDisplayMethods:
         
         text = console.export_text()
         assert "input size:          1.0TB" in text
+        
+        # Clear console for next test
+        console.clear()
+        
+        # Test single file no_merge with filename display
+        ui.show_conversion_summary(
+            total_files=1,
+            output_count=1,
+            merge_mode=MergeMode.NO_MERGE,
+            merged_filename=None,
+            total_runtime=2.5,
+            total_input_size_formatted="100.0KB",
+            total_output_size_formatted="80.0KB",
+            single_output_filename="document.txt"
+        )
+        
+        text = console.export_text()
+        assert "output created:      document.txt" in text
+        assert "total runtime:       2.50s" in text
     
     def test_clear_and_show_header(self):
         """Test clear_and_show_header clears console and redraws header"""
@@ -612,13 +631,13 @@ class TestUserInput:
         ui = RetroCLI(console=console)
         
         monkeypatch.setattr(ui, "input_center", lambda prompt=">>: ": next(inputs))
-        monkeypatch.setattr(ui, "_select_output_format", lambda: 1)
+        monkeypatch.setattr(ui, "_select_output_format", lambda: OutputFormat.PLAIN_TEXT)
         monkeypatch.setattr(ui, "_select_merge_mode", lambda: MergeMode.NO_MERGE)
         
         path, format_choice, merge, merged_filename = ui.get_user_input()
         
         assert path == "test.pdf"
-        assert format_choice == 1
+        assert format_choice == OutputFormat.PLAIN_TEXT
         assert merge == MergeMode.NO_MERGE
         assert merged_filename is None
     
@@ -630,13 +649,13 @@ class TestUserInput:
         ui = RetroCLI(console=console)
         
         monkeypatch.setattr(ui, "input_center", lambda prompt=">>: ": next(inputs))
-        monkeypatch.setattr(ui, "_select_output_format", lambda: 2)
+        monkeypatch.setattr(ui, "_select_output_format", lambda: OutputFormat.MARKDOWN)
         monkeypatch.setattr(ui, "_select_merge_mode", lambda: MergeMode.MERGE)
         monkeypatch.setattr(ui, "_prompt_merged_filename", lambda: "my_merged")
         
         path, format_choice, merge, merged_filename = ui.get_user_input()
         
-        assert format_choice == 2
+        assert format_choice == OutputFormat.MARKDOWN
         assert merge == MergeMode.MERGE
         assert merged_filename == "my_merged"
     
@@ -648,12 +667,12 @@ class TestUserInput:
         ui = RetroCLI(console=console)
         
         monkeypatch.setattr(ui, "input_center", lambda prompt=">>: ": next(inputs))
-        monkeypatch.setattr(ui, "_select_output_format", lambda: 3)
+        monkeypatch.setattr(ui, "_select_output_format", lambda: OutputFormat.JSON)
         monkeypatch.setattr(ui, "_select_merge_mode", lambda: MergeMode.PER_PAGE)
         
         path, format_choice, merge, merged_filename = ui.get_user_input()
         
-        assert format_choice == 3
+        assert format_choice == OutputFormat.JSON
         assert merge == MergeMode.PER_PAGE
         assert merged_filename is None
     
@@ -847,7 +866,7 @@ class TestOutputFormatSelection:
         monkeypatch.setattr(readchar, "readchar", lambda: next(key_iter))
         
         result = ui._select_output_format()
-        assert result == 3
+        assert result == OutputFormat.JSON
     
     def test_select_output_format_up_arrow_wrapping(self, monkeypatch):
         """Test _select_output_format with up arrow wrapping to end"""
@@ -865,7 +884,7 @@ class TestOutputFormatSelection:
         monkeypatch.setattr(readchar, "readchar", lambda: next(key_iter))
         
         result = ui._select_output_format()
-        assert result == 3
+        assert result == OutputFormat.JSON
     
     def test_select_output_format_default_selection(self, monkeypatch):
         """Test _select_output_format with immediate enter (selects plain text = 1)"""
@@ -880,4 +899,4 @@ class TestOutputFormatSelection:
         monkeypatch.setattr(readchar, "readchar", lambda: next(key_iter))
         
         result = ui._select_output_format()
-        assert result == 1
+        assert result == OutputFormat.PLAIN_TEXT

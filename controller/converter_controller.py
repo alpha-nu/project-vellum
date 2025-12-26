@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import List, Optional
 import time
 from view.interface import UIInterface
-from view.ui import MergeMode
+from view.ui import MergeMode, OutputFormat
 from model.converters import PDFConverter, EPubConverter
 from model.outputs import PlainTextHandler, MarkdownHandler, JSONHandler, OutputHandler
 from model.file import File
@@ -36,9 +36,9 @@ class ConverterController:
     
     # Output format handlers
     FORMAT_HANDLERS = {
-        1: PlainTextHandler(),
-        2: MarkdownHandler(),
-        3: JSONHandler(),
+        OutputFormat.PLAIN_TEXT: PlainTextHandler(),
+        OutputFormat.MARKDOWN: MarkdownHandler(),
+        OutputFormat.JSON: JSONHandler(),
     }
     
     def __init__(self, ui: UIInterface):
@@ -126,12 +126,18 @@ class ConverterController:
         # Handle output based on merge mode
         merged_output_filename = None
         if merge_mode == MergeMode.MERGE and accumulator:
-            merged_output_filename, merge_output_size = self._save_merged_output(input_path, handler, accumulator, merged_filename)
+            merged_output_filename, merge_output_size = self._save_merged_output(input_path, handler, accumulator, format_choice, merged_filename)
             total_output_size += merge_output_size
             output_count = 1  # Override with 1 for merged output
 
         # Show comprehensive conversion summary
         elapsed = time.perf_counter() - start_time
+        
+        # Compute single output filename for no-merge single file case
+        single_output_filename = None
+        if merge_mode == MergeMode.NO_MERGE and len(files) == 1:
+            single_output_filename = files[0].with_suffix(format_choice.extension).name
+        
         self.ui.show_conversion_summary(
             total_files=len(files),
             output_count=output_count,
@@ -139,7 +145,8 @@ class ConverterController:
             merged_filename=merged_output_filename,
             total_runtime=elapsed,
             total_input_size_formatted=File.format_file_size(total_input_size),
-            total_output_size_formatted=File.format_file_size(total_output_size)
+            total_output_size_formatted=File.format_file_size(total_output_size),
+            single_output_filename=single_output_filename
         )
 
         # Ask user whether to run another conversion or quit
@@ -317,6 +324,7 @@ class ConverterController:
         input_path: Path, 
         handler: OutputHandler, 
         accumulator: List[str],
+        format_choice: OutputFormat,
         merged_filename: Optional[str] = None
     ) -> tuple[str, int]:
         """
@@ -327,10 +335,11 @@ class ConverterController:
             handler: Output format handler
             accumulator: List of content strings to merge
             merged_filename: Optional custom filename for the merged output (without extension)
+            format_choice: OutputFormat choice
             
         Returns:
             Tuple of (filename, output_size)
-            - filename: Name of the merged output file
+            - filename: Name of the merged output file with extension
             - output_size: Size of the merged output file
         """
         if merged_filename:
@@ -342,4 +351,7 @@ class ConverterController:
         
         output_size = handler.save("\n\n".join(accumulator), output_name)
         
-        return output_name.name, output_size
+        # Compute the actual filename with extension
+        actual_filename = output_name.with_suffix(format_choice.extension).name
+        
+        return actual_filename, output_size
