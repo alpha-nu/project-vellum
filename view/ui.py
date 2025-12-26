@@ -553,17 +553,6 @@ class RetroCLI(UIInterface):
             )
         )
 
-    def show_shutdown(self, elapsed_seconds: float):
-        content = (
-            f"[{self.colors['confirm']}]conversion complete[/]\n"
-            f"[{self.colors['accented']}]run time: {elapsed_seconds:.2f}s[/]")
-        panel = Panel(
-            Text.from_markup(content),
-            border_style=self.colors["subtle"],
-            width=min(self.max_width, self.console.size.width),
-        )
-        self.print_center(panel)
-
     def ask_again(self):
         while True:
             token = read_keyboard_key()

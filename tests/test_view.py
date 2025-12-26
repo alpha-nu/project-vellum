@@ -254,17 +254,6 @@ class TestDisplayMethods:
         text = console.export_text()
         assert "fatal error" in text
     
-    def test_show_shutdown(self):
-        """Test shutdown message with various times"""
-        console = Console(record=True)
-        ui = RetroCLI(console=console)
-        
-        ui.show_shutdown(1.23)
-        
-        text = console.export_text()
-        assert "conversion complete" in text.lower()
-        assert "1.23" in text
-    
     def test_show_conversion_summary(self):
         """Test conversion summary display with different merge modes"""
         console = Console(record=True)
@@ -803,7 +792,6 @@ def test_retrocli_basic_rendering():
     ui.draw_header()
     ui.print_panel("hello world")
     ui.show_error("something went wrong")
-    ui.show_shutdown(1.23)
 
 
 class TestMergeModeSelection:

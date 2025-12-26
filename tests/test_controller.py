@@ -55,9 +55,6 @@ class FakeUI:
     def show_error(self, *a, **k):
         pass
 
-    def show_shutdown(self, *a, **k):
-        pass
-
     def show_conversion_summary(self, *a, **k):
         pass
 
@@ -491,9 +488,6 @@ class TestControllerPerPageMode:
             def show_error(self, msg):
                 pass
             
-            def show_shutdown(self, elapsed):
-                pass
-            
             def show_conversion_summary(self, *a, **k):
                 pass
         
@@ -581,9 +575,6 @@ class TestControllerPerPageMode:
                 return _ctx()
             
             def show_error(self, msg):
-                pass
-            
-            def show_shutdown(self, elapsed):
                 pass
             
             def show_conversion_summary(self, *a, **k):
