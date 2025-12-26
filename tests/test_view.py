@@ -673,7 +673,7 @@ class TestUserInput:
         ui = RetroCLI(console=console)
         
         monkeypatch.setattr(ui, "input_center", lambda prompt=">>: ": next(inputs))
-        monkeypatch.setattr(ui, "_select_output_format", lambda: 1)
+        monkeypatch.setattr(ui, "_select_output_format", lambda: OutputFormat.MARKDOWN)
         monkeypatch.setattr(ui, "_select_merge_mode", lambda: MergeMode.NO_MERGE)
         
         path, format_choice, merge, merged_filename = ui.get_user_input()
@@ -689,7 +689,7 @@ class TestUserInput:
         ui = RetroCLI(console=console)
         
         monkeypatch.setattr(ui, "input_center", lambda prompt=">>: ": next(inputs))
-        monkeypatch.setattr(ui, "_select_output_format", lambda: 1)
+        monkeypatch.setattr(ui, "_select_output_format", lambda: OutputFormat.MARKDOWN)
         monkeypatch.setattr(ui, "_select_merge_mode", lambda: MergeMode.NO_MERGE)
         
         path, format_choice, merge, merged_filename = ui.get_user_input()
@@ -705,7 +705,7 @@ class TestUserInput:
         ui = RetroCLI(console=console)
         
         monkeypatch.setattr(ui, "input_center", lambda prompt=">>: ": next(inputs))
-        monkeypatch.setattr(ui, "_select_output_format", lambda: 1)
+        monkeypatch.setattr(ui, "_select_output_format", lambda: OutputFormat.MARKDOWN)
         monkeypatch.setattr(ui, "_select_merge_mode", lambda: MergeMode.PER_PAGE)
         
         path, format_choice, merge, merged_filename = ui.get_user_input()

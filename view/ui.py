@@ -11,8 +11,6 @@ from rich.live import Live
 from contextlib import contextmanager
 from rich.table import Table
 from rich.align import Align
-import readchar
-from pathlib import Path
 from typing import Optional
 from enum import Enum
 from view.interface import UIInterface
@@ -23,6 +21,22 @@ class MergeMode(Enum):
     NO_MERGE = "no_merge"
     MERGE = "merge"
     PER_PAGE = "per_page"
+    
+    @property
+    def display_name(self) -> str:
+        return {
+            MergeMode.NO_MERGE: "no merge",
+            MergeMode.MERGE: "merge",
+            MergeMode.PER_PAGE: "file per page"
+        }[self]
+    
+    @property
+    def display_hint(self) -> str:
+        return {
+            MergeMode.NO_MERGE: "(separate file per document)",
+            MergeMode.MERGE: "(combine all into single file)",
+            MergeMode.PER_PAGE: "(one file per page/chapter)"
+        }[self]
 
 
 class OutputFormat(Enum):
@@ -277,6 +291,15 @@ class RetroCLI(UIInterface):
         return selected_indices
 
     def get_user_input(self):
+        """Get user input from user with selection dialogs."""
+        path_str = self._get_path_input()
+        format_choice = self._select_output_format()
+        merge_choice = self._select_merge_mode()
+        merged_filename = self._prompt_merged_filename() if merge_choice == MergeMode.MERGE else None
+        return path_str, format_choice, merge_choice, merged_filename
+
+    def _get_path_input(self) -> str:
+        """Get path input from user."""
         self.console.clear()
         self.draw_header()
 
@@ -287,17 +310,7 @@ class RetroCLI(UIInterface):
         )
         self.print_center(path_prompt)
         path_str = self.input_center()
-
-        # Output format selection menu
-        format_choice = self._select_output_format()
-
-        # Merge mode selection menu
-        merge_choice = self._select_merge_mode()
-
-        # If merge mode selected, prompt for filename
-        merged_filename = self._prompt_merged_filename() if merge_choice == MergeMode.MERGE else None
-
-        return path_str, format_choice, merge_choice, merged_filename
+        return path_str
 
     def _select_output_format(self) -> OutputFormat:
         """
@@ -374,9 +387,9 @@ class RetroCLI(UIInterface):
             One of: MergeMode.NO_MERGE, MergeMode.MERGE, MergeMode.PER_PAGE
         """
         options = [
-            (MergeMode.NO_MERGE, "no merge", "(separate file per document)"),
-            (MergeMode.MERGE, "merge", "(combine all into single file)"),
-            (MergeMode.PER_PAGE, "file per page", "(one file per page/chapter)"),
+            MergeMode.NO_MERGE,
+            MergeMode.MERGE,
+            MergeMode.PER_PAGE,
         ]
         current_index = 0  # Default to "no_merge"
         
@@ -397,14 +410,14 @@ class RetroCLI(UIInterface):
             )
             table.add_column("option", style=self.colors["subtle"])
 
-            for i, (_, name, hint) in enumerate(options):
+            for i, mode in enumerate(options):
                 # Radio button: filled if selected, empty if not
                 if i == current_index:
                     radio = f"[{self.colors['secondary']}]●[/]"
-                    option_text = f"[{self.colors['secondary']}]{name}[/] [{self.colors['secondary']}]{hint}[/]"
+                    option_text = f"[{self.colors['secondary']}]{mode.display_name}[/] [{self.colors['secondary']}]{mode.display_hint}[/]"
                 else:
                     radio = "○"
-                    option_text = f"[{self.colors['primary']}]{name}[/] {hint}"
+                    option_text = f"[{self.colors['primary']}]{mode.display_name}[/] {mode.display_hint}"
                 marker = f"[{self.colors['secondary']}]►[/]" if i == current_index else " "
                 table.add_row(f"{marker} {radio} {option_text}")
 
@@ -431,7 +444,7 @@ class RetroCLI(UIInterface):
                 current_index = (current_index + 1) % len(options)
             elif token.key == KeyboardKey.ENTER:
                 # Enter confirms the current selection
-                return options[current_index][0]
+                return options[current_index]
 
     def _prompt_merged_filename(self) -> str:
         """
