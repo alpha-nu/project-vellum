@@ -214,7 +214,7 @@ class RetroCLI(UIInterface):
             )
             self.print_center(
                 Panel(
-                    f"[{self.colors['primary']}][{self.colors["secondary"]}]⬆︎ /⬇︎[/] :navigate  [{self.colors["secondary"]}][SPACE][/]:select  [{self.colors["secondary"]}][A][/]:all  [{self.colors["secondary"]}][Q][/]:quit  [{self.colors["secondary"]}][ENTER][/]:confirm[/]",
+                    f"[{self.colors['primary']}][{self.colors["secondary"]}]⬆︎ /⬇︎[/] :navigate  [{self.colors["secondary"]}][SPACE][/]:select  [{self.colors["secondary"]}][A][/]:all  [{self.colors["secondary"]}][ENTER][/]:confirm  [{self.colors["secondary"]}][Q][/]:quit[/]",
                     border_style=self.colors["subtle"],
                     width=panel_width,
                 )
@@ -454,9 +454,6 @@ class RetroCLI(UIInterface):
     def show_error(self, message: str):
         self.print_panel(message, content_color_key="error")
 
-    def show_no_files(self):
-        self.print_panel("no compatible files found", content_color_key="error")
-
     def show_conversion_summary(
         self, 
         total_files: int, 
@@ -497,6 +494,19 @@ class RetroCLI(UIInterface):
         )
         self.print_center(panel)
 
+        # After showing the summary, provide simple actions for the user
+        actions_hint = (
+            f"[{self.colors['primary']}][{self.colors['secondary']}]"
+            f"[ENTER][/]:run another conversion  [{self.colors['secondary']}][Q][/]:quit"
+        )
+        self.print_center(
+            Panel(
+                actions_hint,
+                border_style=self.colors["subtle"],
+                width=min(self.max_width, self.console.size.width),
+            )
+        )
+
     def show_shutdown(self, elapsed_seconds: float):
         content = (
             f"[{self.colors['confirm']}]conversion complete[/]\n"
@@ -507,3 +517,11 @@ class RetroCLI(UIInterface):
             width=min(self.max_width, self.console.size.width),
         )
         self.print_center(panel)
+
+    def ask_again(self):
+        while True:
+            key = readchar.readchar()
+            if key in ("\r", "\n"):
+                return True
+            elif key.lower() == "q":
+                return False

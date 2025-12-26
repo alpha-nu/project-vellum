@@ -53,10 +53,6 @@ class UIInterface(ABC):
         pass
 
     @abstractmethod
-    def show_no_files(self):
-        pass
-
-    @abstractmethod
     def show_conversion_summary(
         self, 
         total_files: int, 

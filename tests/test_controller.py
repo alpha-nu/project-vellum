@@ -1,5 +1,5 @@
 from pathlib import Path
-
+from unittest.mock import Mock
 from controller.converter_controller import ConverterController
 
 
@@ -54,14 +54,15 @@ class FakeUI:
     def show_error(self, *a, **k):
         pass
 
-    def show_no_files(self, *a, **k):
-        pass
-
     def show_shutdown(self, *a, **k):
         pass
 
     def show_conversion_summary(self, *a, **k):
         pass
+
+    def ask_again(self):
+        """Default behavior: do not run again."""
+        return False
 
 
 class FakeConverter:
@@ -196,26 +197,48 @@ def test_controller_no_compatible_files(tmp_path):
     # Create only incompatible files
     (tmp_path / "file.txt").write_text("text")
     (tmp_path / "file.docx").write_text("doc")
-    
-    class NoFilesUI(FakeUI):
-        def __init__(self, directory):
-            super().__init__(directory)
-            self.no_files_shown = False
-        
-        def get_user_input(self):
-            return str(self._tmp), 1, False
-        
-        def select_files(self, file_data):
-            return []  # User selects nothing
-        
-        def show_no_files(self):
-            self.no_files_shown = True
-    
-    ui = NoFilesUI(tmp_path)
+
+    ui = FakeUI(tmp_path)
+    ui.show_error = Mock()
     controller = ConverterController(ui)
     controller.run()
-    
-    assert ui.no_files_shown
+
+    assert ui.show_error.call_args[0][0] == "no compatible files found"
+
+
+def test_controller_run_again(tmp_path, monkeypatch):
+    """Ensure the controller can perform another run when the user opts to."""
+    # create dummy file
+    tmp_file = tmp_path / "doc.pdf"
+    tmp_file.write_text("pdf content")
+
+    # monkeypatch get_converter to return FakeConverter
+    monkeypatch.setattr(
+        "controller.converter_controller.ConverterController.get_converter",
+        lambda self, p: FakeConverter(p)
+    )
+
+    class RunAgainUI(FakeUI):
+        def __init__(self, tmp_file):
+            super().__init__(tmp_file)
+            self.ask_calls = 0
+
+        def ask_again(self):
+            # First ask -> run again; second ask -> quit
+            self.ask_calls += 1
+            return self.ask_calls == 1
+
+    ui = RunAgainUI(tmp_file)
+    controller = ConverterController(ui)
+
+    controller.run()
+
+    # verify output file was written by PlainTextHandler
+    out = tmp_file.with_suffix('.txt')
+    assert out.exists()
+    assert out.read_text() == "dummy"
+    # ask_again should have been called twice (once True, once False)
+    assert ui.ask_calls == 2
 
 
 def test_controller_different_formats(tmp_path, monkeypatch):

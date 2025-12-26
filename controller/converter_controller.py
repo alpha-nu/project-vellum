@@ -16,6 +16,14 @@ from model.outputs import PlainTextHandler, MarkdownHandler, JSONHandler, Output
 from model.file import File
 
 
+from enum import Enum
+
+
+class NextAction(Enum):
+    QUIT = 0
+    RESTART = 1
+
+
 class ConverterController:
     """Controller that orchestrates document conversion workflow."""
     
@@ -72,55 +80,55 @@ class ConverterController:
     
     def run(self):
         """
-        Main controller workflow.
-        
-        Orchestrates the entire conversion process:
-        1. Display header
-        2. Get user input
-        3. Validate path
-        4. Handle batch or single file
-        5. Process files
-        6. Handle merge mode (no_merge, merge, or per_page)
-        7. Show completion
+        Run the conversion workflow repeatedly while the user opts to restart.
+        """
+        while self.run_once() == NextAction.RESTART:
+            continue
+
+    def run_once(self) -> NextAction:
+        """Perform a single conversion workflow run.
+
+        Returns:
+            NextAction.RESTART if the user wants to run again, otherwise NextAction.QUIT
         """
         self.ui.draw_header()
-        
+
         # Get user input
         input_str, format_choice, merge_mode = self.ui.get_user_input()
         input_path = Path(input_str)
-        
+
         # Validate path
         if not input_path.exists():
             self.ui.show_error("fatal error: path not found")
-            return
-        
+            return NextAction.QUIT
+
         # Determine files to process
         files = self._get_files_to_process(input_path)
-        
+
         if not files:
-            self.ui.show_no_files()
-            return
-        
+            self.ui.show_error("no compatible files found")
+            return NextAction.QUIT
+
         # Clear screen and redraw header before processing
         self.ui.clear_and_show_header()
-        
+
         # Get output handler
         handler = self.FORMAT_HANDLERS[format_choice]
-        
+
         # Calculate total input size
         total_input_size = sum(file.stat().st_size for file in files)
-        
+
         # Process files
         start_time = time.perf_counter()
         accumulator, output_count, total_output_size = self._process_files(files, handler, merge_mode)
-        
+
         # Handle output based on merge mode
         merged_filename = None
         if merge_mode == "merge" and accumulator:
             merged_filename, merge_output_size = self._save_merged_output(input_path, handler, accumulator)
             total_output_size += merge_output_size
             output_count = 1  # Override with 1 for merged output
-        
+
         # Show comprehensive conversion summary
         elapsed = time.perf_counter() - start_time
         self.ui.show_conversion_summary(
@@ -132,6 +140,16 @@ class ConverterController:
             total_input_size_formatted=File.format_file_size(total_input_size),
             total_output_size_formatted=File.format_file_size(total_output_size)
         )
+
+        # Ask user whether to run another conversion or quit
+        try:
+            run_again = self.ui.ask_again()
+        except Exception:
+            # If UI doesn't implement the method, default to quitting
+            return NextAction.QUIT
+
+        return NextAction.RESTART if run_again else NextAction.QUIT
+
     
     def _get_files_to_process(self, input_path: Path) -> List[Path]:
         """

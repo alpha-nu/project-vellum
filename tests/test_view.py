@@ -253,16 +253,6 @@ class TestDisplayMethods:
         text = console.export_text()
         assert "fatal error" in text
     
-    def test_show_no_files(self):
-        """Test no files message"""
-        console = Console(record=True)
-        ui = RetroCLI(console=console)
-        
-        ui.show_no_files()
-        
-        text = console.export_text()
-        assert "no compatible files" in text.lower()
-    
     def test_show_shutdown(self):
         """Test shutdown message with various times"""
         console = Console(record=True)
@@ -296,6 +286,9 @@ class TestDisplayMethods:
         assert "output created:      3 files" in text
         assert "total runtime:       45.67s" in text
         assert "input size:          2.0MB" in text
+        # Keybinding hint should be present for running again or quitting
+        assert "run another conversion" in text
+        assert "quit" in text
         
         # Clear console for next test
         console.clear()
@@ -385,6 +378,31 @@ class TestDisplayMethods:
         text = console.export_text()
         assert "converter" in text.lower()
         assert "v.1.0.0" in text
+
+    def test_ask_again_enter_and_quit(self, monkeypatch):
+        """ask_again should return True for Enter and False for 'q'"""
+        console = Console(record=True)
+        ui = RetroCLI(console=console)
+
+        # Enter -> True
+        monkeypatch.setattr("view.ui.readchar.readchar", lambda: "\r")
+        assert ui.ask_again() is True
+
+        # 'q' -> False
+        monkeypatch.setattr("view.ui.readchar.readchar", lambda: "q")
+        assert ui.ask_again() is False
+
+    def test_ask_again_ignores_other_keys(self, monkeypatch):
+        """ask_again should ignore unrelated keys until a valid one is pressed"""
+        console = Console(record=True)
+        ui = RetroCLI(console=console)
+
+        seq = ["x", "\n"]
+        def fake_read():
+            return seq.pop(0)
+
+        monkeypatch.setattr("view.ui.readchar.readchar", fake_read)
+        assert ui.ask_again() is True
 
 
 class TestInteractiveSelection:
@@ -746,7 +764,6 @@ def test_retrocli_basic_rendering():
     ui.draw_header()
     ui.print_panel("hello world")
     ui.show_error("something went wrong")
-    ui.show_no_files()
     ui.show_shutdown(1.23)
 
 
