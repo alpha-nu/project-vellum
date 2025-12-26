@@ -192,12 +192,12 @@ class RetroCLI(UIInterface):
             table_width = panel_width - 4
 
             table = Table(
-                title=f"[{self.colors['primary']}]select files for conversion[/]",
+                title=f"[{self.colors['primary']}]select files for conversion[/]\n",
                 title_justify="left",
                 title_style="",
                 show_header=False,
                 width=table_width,
-                border_style=self.colors["subtle"],
+                show_edge=False,
             )
             table.add_column("file", style=self.colors["subtle"])
 
@@ -299,12 +299,12 @@ class RetroCLI(UIInterface):
             table_width = panel_width - 4
 
             table = Table(
-                title=f"[{self.colors['primary']}]select output format[/]",
+                title=f"[{self.colors['primary']}]select output format[/]\n",
                 title_justify="left",
                 title_style="",
                 show_header=False,
                 width=table_width,
-                border_style=self.colors["subtle"],
+                show_edge=False,
             )
             table.add_column("option", style=self.colors["subtle"])
 
@@ -366,12 +366,12 @@ class RetroCLI(UIInterface):
             table_width = panel_width - 4
 
             table = Table(
-                title=f"[{self.colors['primary']}]select merge mode[/]",
+                title=f"[{self.colors['primary']}]select merge mode[/]\n",
                 title_justify="left",
                 title_style="",
                 show_header=False,
                 width=table_width,
-                border_style=self.colors["subtle"],
+                show_edge=False,
             )
             table.add_column("option", style=self.colors["subtle"])
 
