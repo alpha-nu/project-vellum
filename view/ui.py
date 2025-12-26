@@ -15,6 +15,7 @@ import readchar
 from pathlib import Path
 from typing import Optional
 from view.interface import UIInterface
+from view.keyboard import KeyboardKey, read_keyboard_key
 
 
 class _StyledTimeMixin:
@@ -130,6 +131,8 @@ class RetroCLI(UIInterface):
         markup = f"[{self.colors['primary']}]" + prompt_str + "[/]"
         return self.console.input(markup, markup=True)
 
+
+
     def clear_and_show_header(self):
         """Clear screen and display header - used after file selection to show clean progress view"""
         self.console.clear()
@@ -220,30 +223,25 @@ class RetroCLI(UIInterface):
                 )
             )
 
-            key = readchar.readchar()
+            token = read_keyboard_key()
 
-            if key == "\x1b":
-                next1 = readchar.readchar()
-                next2 = readchar.readchar()
-                if next1 == "[":
-                    if next2 == "A":
-                        current_index = (current_index - 1) % len(file_data)
-                    elif next2 == "B":
-                        current_index = (current_index + 1) % len(file_data)
-            elif key == " ":
+            if token.key == KeyboardKey.UP:
+                current_index = (current_index - 1) % len(file_data)
+            elif token.key == KeyboardKey.DOWN:
+                current_index = (current_index + 1) % len(file_data)
+            elif token.key == KeyboardKey.SPACE:
                 if current_index in selected_indices:
                     selected_indices.remove(current_index)
                 else:
                     selected_indices.append(current_index)
-            elif key in ("\r", "\n"):
+            elif token.key == KeyboardKey.ENTER:
                 break
-            elif key.lower() == "a":
-                # Toggle: if all are selected, deselect all; otherwise select all
+            elif token.key == KeyboardKey.CHAR and token.char == "a":
                 if len(selected_indices) == len(file_data):
                     selected_indices = []
                 else:
                     selected_indices = list(range(len(file_data)))
-            elif key.lower() == "q":
+            elif token.key == KeyboardKey.CHAR and token.char == "q":
                 import sys
                 sys.exit(0)
 
@@ -326,17 +324,13 @@ class RetroCLI(UIInterface):
                 )
             )
 
-            key = readchar.readchar()
+            token = read_keyboard_key()
 
-            if key == "\x1b":
-                next1 = readchar.readchar()
-                next2 = readchar.readchar()
-                if next1 == "[":
-                    if next2 == "A":
-                        current_index = (current_index - 1) % len(options)
-                    elif next2 == "B":
-                        current_index = (current_index + 1) % len(options)
-            elif key in ("\r", "\n"):
+            if token.key == KeyboardKey.UP:
+                current_index = (current_index - 1) % len(options)
+            elif token.key == KeyboardKey.DOWN:
+                current_index = (current_index + 1) % len(options)
+            elif token.key == KeyboardKey.ENTER:
                 # Enter confirms the current selection
                 return current_index + 1
 
@@ -397,20 +391,15 @@ class RetroCLI(UIInterface):
                 )
             )
 
-            key = readchar.readchar()
+            token = read_keyboard_key()
 
-            if key == "\x1b":
-                next1 = readchar.readchar()
-                next2 = readchar.readchar()
-                if next1 == "[":
-                    if next2 == "A":
-                        current_index = (current_index - 1) % len(options)
-                    elif next2 == "B":
-                        current_index = (current_index + 1) % len(options)
-            elif key in ("\r", "\n"):
+            if token.key == KeyboardKey.UP:
+                current_index = (current_index - 1) % len(options)
+            elif token.key == KeyboardKey.DOWN:
+                current_index = (current_index + 1) % len(options)
+            elif token.key == KeyboardKey.ENTER:
                 # Enter confirms the current selection
                 return options[current_index][0]
-
     def get_progress_bar(self):
         @contextmanager
         def _progress_ctx():
@@ -520,8 +509,9 @@ class RetroCLI(UIInterface):
 
     def ask_again(self):
         while True:
-            key = readchar.readchar()
-            if key in ("\r", "\n"):
+            token = read_keyboard_key()
+            if token.key == KeyboardKey.ENTER:
                 return True
-            elif key.lower() == "q":
+            elif token.key == KeyboardKey.CHAR and token.char == "q":
                 return False
+            # Else continue waiting

@@ -385,11 +385,11 @@ class TestDisplayMethods:
         ui = RetroCLI(console=console)
 
         # Enter -> True
-        monkeypatch.setattr("view.ui.readchar.readchar", lambda: "\r")
+        monkeypatch.setattr("view.keyboard.readchar.readchar", lambda: "\r")
         assert ui.ask_again() is True
 
         # 'q' -> False
-        monkeypatch.setattr("view.ui.readchar.readchar", lambda: "q")
+        monkeypatch.setattr("view.keyboard.readchar.readchar", lambda: "q")
         assert ui.ask_again() is False
 
     def test_ask_again_ignores_other_keys(self, monkeypatch):
@@ -401,8 +401,9 @@ class TestDisplayMethods:
         def fake_read():
             return seq.pop(0)
 
-        monkeypatch.setattr("view.ui.readchar.readchar", fake_read)
+        monkeypatch.setattr("view.keyboard.readchar.readchar", fake_read)
         assert ui.ask_again() is True
+
 
 
 class TestInteractiveSelection:
@@ -414,7 +415,7 @@ class TestInteractiveSelection:
         from model.file import File
         return [File.from_path(p).to_dict() for p in paths]
     
-    @patch('view.ui.readchar.readchar')
+    @patch('view.keyboard.readchar.readchar')
     def test_select_files_enter_immediately(self, mock_readchar, tmp_path):
         """Test selecting files by pressing enter immediately (no selection)"""
         files = [tmp_path / f"file{i}.pdf" for i in range(3)]
@@ -432,7 +433,7 @@ class TestInteractiveSelection:
         
         assert selected == []
     
-    @patch('view.ui.readchar.readchar')
+    @patch('view.keyboard.readchar.readchar')
     def test_select_files_space_then_enter(self, mock_readchar, tmp_path):
         """Test selecting file with space then enter"""
         files = [tmp_path / f"file{i}.pdf" for i in range(2)]
@@ -451,7 +452,7 @@ class TestInteractiveSelection:
         assert len(selected) == 1
         assert selected[0] == 0  # First file index
     
-    @patch('view.ui.readchar.readchar')
+    @patch('view.keyboard.readchar.readchar')
     def test_select_files_down_arrow(self, mock_readchar, tmp_path):
         """Test navigating with down arrow"""
         files = [tmp_path / f"file{i}.pdf" for i in range(3)]
@@ -475,7 +476,7 @@ class TestInteractiveSelection:
         assert len(selected) == 1
         assert selected[0] == 1
     
-    @patch('view.ui.readchar.readchar')
+    @patch('view.keyboard.readchar.readchar')
     def test_select_files_up_arrow(self, mock_readchar, tmp_path):
         """Test navigating with up arrow"""
         files = [tmp_path / f"file{i}.pdf" for i in range(3)]
@@ -499,7 +500,7 @@ class TestInteractiveSelection:
         assert len(selected) == 1
         assert selected[0] == 2  # Last file index
     
-    @patch('view.ui.readchar.readchar')
+    @patch('view.keyboard.readchar.readchar')
     def test_select_files_toggle_on_off(self, mock_readchar, tmp_path):
         """Test toggling selection on and off"""
         files = [tmp_path / "file.pdf"]
@@ -517,7 +518,7 @@ class TestInteractiveSelection:
         # Should be deselected
         assert selected == []
     
-    @patch('view.ui.readchar.readchar')
+    @patch('view.keyboard.readchar.readchar')
     def test_select_files_select_all(self, mock_readchar, tmp_path):
         """Test selecting all with 'a' key - should select but not confirm"""
         files = [tmp_path / f"file{i}.pdf" for i in range(3)]
@@ -536,7 +537,7 @@ class TestInteractiveSelection:
         assert len(selected) == 3
         assert selected == [0, 1, 2]  # All indices
     
-    @patch('view.ui.readchar.readchar')
+    @patch('view.keyboard.readchar.readchar')
     def test_select_files_quit(self, mock_readchar, tmp_path):
         """Test quitting with 'q' key exits application"""
         files = [tmp_path / "file.pdf"]
@@ -556,7 +557,7 @@ class TestInteractiveSelection:
         
         assert exc_info.value.code == 0
     
-    @patch('view.ui.readchar.readchar')
+    @patch('view.keyboard.readchar.readchar')
     def test_select_files_all_toggle_deselect(self, mock_readchar, tmp_path):
         """Test [A] pressed twice toggles: select all then deselect all"""
         files = [tmp_path / f"file{i}.pdf" for i in range(3)]
@@ -575,7 +576,7 @@ class TestInteractiveSelection:
         # Should be empty after toggle
         assert len(selected) == 0
     
-    @patch('view.ui.readchar.readchar')
+    @patch('view.keyboard.readchar.readchar')
     def test_select_files_all_continues_loop(self, mock_readchar, tmp_path):
         """Test [A] selects all but allows further navigation before confirm"""
         files = [tmp_path / f"file{i}.pdf" for i in range(3)]
