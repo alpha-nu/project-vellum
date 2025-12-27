@@ -4,12 +4,40 @@ from bs4 import BeautifulSoup
 import pytesseract
 from PIL import Image
 import io
-from typing import Optional, Callable, List
+from typing import Optional, Callable, List, Any, Protocol
 from model.core import BaseConverter
 
+
+class _PDFReader(Protocol):
+    def open(self, path) -> Any:  # pragma: no cover
+        ...
+
+
+class _EPubReader(Protocol):
+    def open(self, path) -> Any:  # pragma: no cover
+        ...
+
+
+class PyMuPDFReader:
+    """Default PDF reader that opens documents via PyMuPDF."""
+
+    def open(self, path):
+        return fitz.open(path)
+
+
+class EbookLibReader:
+    """Default EPUB reader that opens books via ebooklib."""
+
+    def open(self, path):
+        return epub.read_epub(path)
+
 class PDFConverter(BaseConverter):
+    def __init__(self, source_path, reader: Optional[_PDFReader] = None):
+        super().__init__(source_path)
+        self._reader: _PDFReader = reader or PyMuPDFReader()
+
     def extract_content(self, progress_callback: Optional[Callable[[int, int], None]] = None) -> str:
-        doc = fitz.open(self.source_path)
+        doc = self._reader.open(self.source_path)
         full_text = []
 
         total = len(doc)
@@ -36,7 +64,7 @@ class PDFConverter(BaseConverter):
 
     def extract_content_per_item(self, progress_callback: Optional[Callable[[int, int], None]] = None) -> List[str]:
         """Extract PDF content, one string per page."""
-        doc = fitz.open(self.source_path)
+        doc = self._reader.open(self.source_path)
         pages = []
 
         total = len(doc)
@@ -61,8 +89,12 @@ class PDFConverter(BaseConverter):
         return pages
 
 class EPubConverter(BaseConverter):
+    def __init__(self, source_path, reader: Optional[_EPubReader] = None):
+        super().__init__(source_path)
+        self._reader: _EPubReader = reader or EbookLibReader()
+
     def extract_content(self, progress_callback: Optional[Callable[[int, int], None]] = None) -> str:
-        book = epub.read_epub(self.source_path)
+        book = self._reader.open(self.source_path)
         items = [it for it in book.get_items() if it.get_type() == 9]
         chapters = []
 
@@ -80,7 +112,7 @@ class EPubConverter(BaseConverter):
 
     def extract_content_per_item(self, progress_callback: Optional[Callable[[int, int], None]] = None) -> List[str]:
         """Extract EPUB content, one string per chapter."""
-        book = epub.read_epub(self.source_path)
+        book = self._reader.open(self.source_path)
         items = [it for it in book.get_items() if it.get_type() == 9]
         chapters = []
 
