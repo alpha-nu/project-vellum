@@ -410,8 +410,8 @@ class TestControllerEdgeCases:
             lambda self, p: MockConverter(p)
         )
         monkeypatch.setattr(
-            "controller.converter_controller.ConverterController.FORMAT_HANDLERS",
-            {OutputFormat.PLAIN_TEXT: MockHandler(), OutputFormat.MARKDOWN: MockHandler(), OutputFormat.JSON: MockHandler()}
+            "controller.converter_controller.ConverterController.get_format_handler",
+            lambda self, fmt: MockHandler()
         )
         
         ui = TestUI(test_file)
@@ -497,8 +497,8 @@ class TestControllerPerPageMode:
             lambda self, p: MockConverter(p)
         )
         monkeypatch.setattr(
-            "controller.converter_controller.ConverterController.FORMAT_HANDLERS",
-            {1: MockHandler(), 2: MockHandler(), 3: MockHandler()}
+            "controller.converter_controller.ConverterController.get_format_handler",
+            lambda self, fmt: MockHandler()
         )
         
         ui = TestUI()
@@ -587,8 +587,8 @@ class TestControllerPerPageMode:
             lambda self, p: MockConverter(p)
         )
         monkeypatch.setattr(
-            "controller.converter_controller.ConverterController.FORMAT_HANDLERS",
-            {OutputFormat.PLAIN_TEXT: PlainTextHandler(), OutputFormat.MARKDOWN: PlainTextHandler(), OutputFormat.JSON: PlainTextHandler()}
+            "controller.converter_controller.ConverterController.get_format_handler",
+            lambda self, fmt: PlainTextHandler()
         )
         
         ui = TestUI()
@@ -600,3 +600,46 @@ class TestControllerPerPageMode:
         # Verify output was still created despite exception
         output_file = tmp_path / "test.txt"
         assert output_file.exists()
+
+
+class TestFormatHandlerFactory:
+    """Test the get_format_handler factory method"""
+    
+    def test_get_format_handler_plain_text(self, tmp_path):
+        """Test factory creates PlainTextHandler"""
+        ui = FakeUI(tmp_path / "dummy.pdf")
+        controller = ConverterController(ui)
+        
+        handler = controller.get_format_handler(OutputFormat.PLAIN_TEXT)
+        
+        from model.outputs import PlainTextHandler
+        assert isinstance(handler, PlainTextHandler)
+    
+    def test_get_format_handler_markdown(self, tmp_path):
+        """Test factory creates MarkdownHandler"""
+        ui = FakeUI(tmp_path / "dummy.pdf")
+        controller = ConverterController(ui)
+        
+        handler = controller.get_format_handler(OutputFormat.MARKDOWN)
+        
+        from model.outputs import MarkdownHandler
+        assert isinstance(handler, MarkdownHandler)
+    
+    def test_get_format_handler_json(self, tmp_path):
+        """Test factory creates JSONHandler"""
+        ui = FakeUI(tmp_path / "dummy.pdf")
+        controller = ConverterController(ui)
+        
+        handler = controller.get_format_handler(OutputFormat.JSON)
+        
+        from model.outputs import JSONHandler
+        assert isinstance(handler, JSONHandler)
+    
+    def test_get_format_handler_invalid_format(self, tmp_path):
+        """Test factory raises error for invalid format"""
+        ui = FakeUI(tmp_path / "dummy.pdf")
+        controller = ConverterController(ui)
+        
+        import pytest
+        with pytest.raises(ValueError, match="Unknown output format"):
+            controller.get_format_handler("invalid_format")

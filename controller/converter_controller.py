@@ -34,13 +34,6 @@ class ConverterController:
         ".epub": EPubConverter,
     }
     
-    # Output format handlers
-    FORMAT_HANDLERS = {
-        OutputFormat.PLAIN_TEXT: PlainTextHandler(),
-        OutputFormat.MARKDOWN: MarkdownHandler(),
-        OutputFormat.JSON: JSONHandler(),
-    }
-    
     def __init__(self, ui: UIInterface):
         """
         Initialize the controller with a UI interface.
@@ -79,6 +72,26 @@ class ConverterController:
             if f.suffix.lower() in self.CONVERTER_MAP.keys()
         ]
     
+    def get_format_handler(self, format_choice: OutputFormat) -> OutputHandler:
+        """
+        Factory method for creating output format handlers on-demand.
+        
+        Args:
+            format_choice: The output format to create a handler for
+            
+        Returns:
+            An instance of the appropriate OutputHandler subclass
+        """
+        handlers_map = {
+            OutputFormat.PLAIN_TEXT: PlainTextHandler,
+            OutputFormat.MARKDOWN: MarkdownHandler,
+            OutputFormat.JSON: JSONHandler,
+        }
+        handler_class = handlers_map.get(format_choice)
+        if handler_class is None:
+            raise ValueError(f"Unknown output format: {format_choice}")
+        return handler_class()
+    
     def run(self):
         """
         Run the conversion workflow repeatedly while the user opts to restart.
@@ -114,7 +127,7 @@ class ConverterController:
         self.ui.clear_and_show_header()
 
         # Get output handler
-        handler = self.FORMAT_HANDLERS[format_choice]
+        handler = self.get_format_handler(format_choice)
 
         # Calculate total input size
         total_input_size = sum(file.stat().st_size for file in files)
