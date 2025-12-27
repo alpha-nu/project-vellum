@@ -228,9 +228,6 @@ class RetroCLI(UIInterface):
             table_width = panel_width - 4
 
             table = Table(
-                title=f"[{self.colors['primary']}]select files for conversion[/]\n",
-                title_justify="left",
-                title_style="",
                 show_header=False,
                 width=table_width,
                 show_edge=False,
@@ -254,6 +251,9 @@ class RetroCLI(UIInterface):
             self.print_center(
                 Panel(
                     table,
+                    padding=(1, 0, 0, 0),
+                    title=f"[{self.colors['primary']}]\[select files for conversion][/]",
+                    title_align="left",
                     border_style=self.colors["subtle"],
                     width=panel_width,
                 )
@@ -334,9 +334,6 @@ class RetroCLI(UIInterface):
             table_width = panel_width - 4
 
             table = Table(
-                title=f"[{self.colors['primary']}]select output format[/]\n",
-                title_justify="left",
-                title_style="",
                 show_header=False,
                 width=table_width,
                 show_edge=False,
@@ -357,6 +354,9 @@ class RetroCLI(UIInterface):
             self.print_center(
                 Panel(
                     table,
+                    padding=(1, 0, 0, 0),
+                    title=f"[{self.colors['primary']}]\[select output format][/]",
+                    title_align="left",
                     border_style=self.colors["subtle"],
                     width=panel_width,
                 )
@@ -401,9 +401,6 @@ class RetroCLI(UIInterface):
             table_width = panel_width - 4
 
             table = Table(
-                title=f"[{self.colors['primary']}]select merge mode[/]\n",
-                title_justify="left",
-                title_style="",
                 show_header=False,
                 width=table_width,
                 show_edge=False,
@@ -424,6 +421,9 @@ class RetroCLI(UIInterface):
             self.print_center(
                 Panel(
                     table,
+                    padding=(1, 0, 0, 0),
+                    title=f"[{self.colors['primary']}]\[select merge mode][/]",
+                    title_align="left",
                     border_style=self.colors["subtle"],
                     width=panel_width,
                 )
@@ -538,7 +538,6 @@ class RetroCLI(UIInterface):
                 output_desc = f"{output_count} files"
         
         content = (
-            f"[{self.colors['confirm']}]conversion complete[/]\n\n"
             f"[{self.colors['primary']}]files processed:{'':<4}[/] [{self.colors['secondary']}]{total_files}[/]\n"
             f"[{self.colors['primary']}]output created:{'':<5}[/] [{self.colors['secondary']}]{output_desc}[/]\n"
             f"[{self.colors['primary']}]input size:{'':<9}[/] [{self.colors['secondary']}]{total_input_size_formatted}[/]\n"
@@ -548,6 +547,9 @@ class RetroCLI(UIInterface):
         
         panel = Panel(
             Text.from_markup(content),
+            padding=(1, 0, 0, 0),
+            title=f"[{self.colors['confirm']}]\[conversion complete][/]",
+            title_align="left",
             border_style=self.colors["subtle"],
             width=min(self.max_width, self.console.size.width),
         )
