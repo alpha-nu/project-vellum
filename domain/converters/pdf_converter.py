@@ -2,7 +2,7 @@
 import pytesseract
 from PIL import Image
 import io
-from typing import Optional, Callable, List
+from typing import Optional, Callable, List, Any
 from domain.core.base_converter import BaseConverter
 from .reader_protocols import _PDFReader
 from .pdf_reader import PyMuPDFReader
@@ -15,54 +15,26 @@ class PDFConverter(BaseConverter):
         super().__init__(source_path)
         self._reader: _PDFReader = reader or PyMuPDFReader()
 
-    def extract_content(self, progress_callback: Optional[Callable[[int, int], None]] = None) -> str:
+    def _load_items(self) -> List[Any]:
+        """Load all pages from PDF document."""
         doc = self._reader.open(self.source_path)
-        full_text = []
+        return [doc.load_page(i) for i in range(len(doc))]
 
-        total = len(doc)
-        for page_num in range(total):
-            page = doc.load_page(page_num)
-            text = page.get_text("text").strip()
+    def _extract_from_item(self, page: Any) -> str:
+        """Extract text from a single PDF page with OCR fallback.
+        
+        Args:
+            page: PyMuPDF page object
+        
+        Returns:
+            Extracted text string
+        """
+        text = page.get_text("text").strip()
 
-            # OCR Fallback for scanned/empty pages
-            if not text:
-                pix = page.get_pixmap()
-                img = Image.open(io.BytesIO(pix.tobytes()))
-                text = pytesseract.image_to_string(img)
+        # OCR Fallback for scanned/empty pages
+        if not text:
+            pix = page.get_pixmap()
+            img = Image.open(io.BytesIO(pix.tobytes()))
+            text = pytesseract.image_to_string(img)
 
-            full_text.append(text)
-
-            if progress_callback:
-                try:
-                    progress_callback(page_num + 1, total)
-                except Exception:
-                    # Progress callbacks must not raise to avoid breaking extraction
-                    pass
-
-        return "\n\n".join(full_text)
-
-    def extract_content_per_item(self, progress_callback: Optional[Callable[[int, int], None]] = None) -> List[str]:
-        """Extract PDF content, one string per page."""
-        doc = self._reader.open(self.source_path)
-        pages = []
-
-        total = len(doc)
-        for page_num in range(total):
-            page = doc.load_page(page_num)
-            text = page.get_text("text").strip()
-
-            # OCR Fallback for scanned/empty pages
-            if not text:
-                pix = page.get_pixmap()
-                img = Image.open(io.BytesIO(pix.tobytes()))
-                text = pytesseract.image_to_string(img)
-
-            pages.append(text)
-
-            if progress_callback:
-                try:
-                    progress_callback(page_num + 1, total)
-                except Exception:
-                    pass
-
-        return pages
+        return text

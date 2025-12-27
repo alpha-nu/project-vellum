@@ -1,6 +1,6 @@
 """Tests for BaseConverter abstract base class."""
 from pathlib import Path
-from typing import List
+from typing import List, Any
 import pytest
 from domain.core.base_converter import BaseConverter
 
@@ -8,13 +8,13 @@ from domain.core.base_converter import BaseConverter
 class ConcreteConverter(BaseConverter):
     """Concrete implementation of BaseConverter for testing."""
     
-    def extract_content(self, progress_callback=None) -> str:
-        """Simple implementation for testing."""
-        return f"Content from {self.source_path}"
+    def _load_items(self) -> List[Any]:
+        """Return test items."""
+        return ["item1", "item2"]
     
-    def extract_content_per_item(self, progress_callback=None) -> List[str]:
-        """Simple implementation for testing."""
-        return [f"Item from {self.source_path}"]
+    def _extract_from_item(self, item: Any) -> str:
+        """Extract text from test item."""
+        return f"content from {item}"
 
 
 def test_base_converter_initialization():
@@ -32,7 +32,8 @@ def test_base_converter_extract_content():
     
     result = converter.extract_content()
     
-    assert result == "Content from document.pdf"
+    # Should join items with "\n\n"
+    assert result == "content from item1\n\ncontent from item2"
 
 
 def test_base_converter_extract_content_per_item():
@@ -43,8 +44,9 @@ def test_base_converter_extract_content_per_item():
     result = converter.extract_content_per_item()
     
     assert isinstance(result, list)
-    assert len(result) == 1
-    assert result[0] == "Item from document.pdf"
+    assert len(result) == 2
+    assert result[0] == "content from item1"
+    assert result[1] == "content from item2"
 
 
 def test_base_converter_with_progress_callback():
@@ -58,7 +60,9 @@ def test_base_converter_with_progress_callback():
     
     result = converter.extract_content(progress_callback=progress_cb)
     
-    assert result == "Content from document.pdf"
+    # Should have called progress callback for each item
+    assert calls == [(1, 2), (2, 2)]
+    assert result == "content from item1\n\ncontent from item2"
 
 
 def test_base_converter_extract_content_without_callback():
@@ -68,7 +72,7 @@ def test_base_converter_extract_content_without_callback():
     
     # Call with None explicitly
     result = converter.extract_content(progress_callback=None)
-    assert result == "Content from test.pdf"
+    assert result == "content from item1\n\ncontent from item2"
 
 
 def test_base_converter_extract_content_per_item_without_callback():
@@ -78,23 +82,30 @@ def test_base_converter_extract_content_per_item_without_callback():
     
     # Call with None explicitly
     result = converter.extract_content_per_item(progress_callback=None)
-    assert result == ["Item from test.pdf"]
+    assert result == ["content from item1", "content from item2"]
 
 
 def test_base_converter_abstract_methods_raise_not_implemented():
-    """Test abstract methods raise NotImplementedError when not overridden"""
+    """Test abstract methods are required for instantiation"""
     # Create a class that doesn't fully implement abstract methods
     class PartialConverter(BaseConverter):
-        def extract_content(self, progress_callback=None):
-            return super().extract_content(progress_callback)
-        
-        def extract_content_per_item(self, progress_callback=None):
-            return super().extract_content_per_item(progress_callback)
+        def _load_items(self):
+            # Only implement one of the two abstract methods
+            return []
     
-    converter = PartialConverter(Path("test.pdf"))
+    # Cannot instantiate because _extract_from_item is missing
+    with pytest.raises(TypeError):
+        PartialConverter(Path("test.pdf"))
+
+
+def test_base_converter_progress_callback_with_exception():
+    """Test progress callback exceptions are handled gracefully"""
+    path = Path("test.pdf")
+    converter = ConcreteConverter(path)
     
-    with pytest.raises(NotImplementedError, match="Subclasses must implement extract_content"):
-        converter.extract_content()
+    def bad_callback(current, total):
+        raise ValueError("Test error")
     
-    with pytest.raises(NotImplementedError, match="Subclasses must implement extract_content_per_item"):
-        converter.extract_content_per_item()
+    # Should not raise, exception should be logged
+    result = converter.extract_content(progress_callback=bad_callback)
+    assert result == "content from item1\n\ncontent from item2"
