@@ -20,10 +20,6 @@ class UIInterface(ABC):
         self.keyboard_reader = keyboard_reader or read_keyboard_key
 
     @abstractmethod
-    def print_center(self, renderable):
-        pass
-
-    @abstractmethod
     def input_center(self, prompt_symbol: str = ">>: ") -> str:
         pass
 
