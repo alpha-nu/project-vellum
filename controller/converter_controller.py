@@ -19,15 +19,13 @@ from domain.outputs.markdown_handler import MarkdownHandler
 from domain.outputs.json_handler import JSONHandler
 from domain.core.output_handler import OutputHandler
 from domain.model.file import File
-
-
 from enum import Enum
 
+MERGE_SOURCE_DELIMITER = "\n--- start source: {source} ---\n"
 
 class NextAction(Enum):
     QUIT = 0
     RESTART = 1
-
 
 class ConverterController:
     """Controller that orchestrates document conversion workflow."""
@@ -244,7 +242,7 @@ class ConverterController:
                 
                 if content and merge_mode == MergeMode.MERGE:
                     accumulator.append(
-                        f"\n--- start source: {file.name} ---\n{content}"
+                        MERGE_SOURCE_DELIMITER.format(source=file.name) + content
                     )
         
         return accumulator, output_count, total_output_size
