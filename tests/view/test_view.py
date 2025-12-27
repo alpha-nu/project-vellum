@@ -1,9 +1,12 @@
 import pytest
+import time
+from collections import defaultdict
+from pathlib import Path
+from contextlib import contextmanager
+from unittest.mock import Mock, MagicMock, patch
+
 from rich.console import Console
 from rich.text import Text
-from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch
-from contextlib import contextmanager
 
 from view.ui import (
     RetroCLI,
@@ -13,6 +16,34 @@ from view.ui import (
     _StyledTimeMixin,
 )
 from view.ui import MergeMode, OutputFormat
+from view.keyboard import KeyboardToken, KeyboardKey
+
+from domain.model.file import File
+
+
+# ===== Keyboard Mock Helper =====
+
+def keyboard_from_string(input_str):
+    """Create a keyboard reader from a string representation.
+    Args:
+        input_str: String like "DOWN DOWN SPACE ENTER" or "q"
+    
+    Returns:
+        A callable keyboard reader
+    """
+    key_map = {
+        "UP": KeyboardToken(KeyboardKey.UP),
+        "DOWN": KeyboardToken(KeyboardKey.DOWN),
+        "ENTER": KeyboardToken(KeyboardKey.ENTER),
+        "SPACE": KeyboardToken(KeyboardKey.SPACE),
+    }
+    
+    sequence = []
+    for token in input_str.split():
+        sequence.append(key_map.get(token, KeyboardToken(KeyboardKey.CHAR, token.lower())))
+        
+    iterator = iter(sequence)
+    return lambda: next(iterator)
 
 
 class TestRetroCLIBasics:
@@ -130,7 +161,6 @@ class TestProgressColumns:
     
     def test_styled_time_elapsed_column_converting(self):
         """Test time elapsed column during conversion"""
-        import time
         column = StyledTimeElapsedColumn("cyan")
         
         # Create mock task with start time
@@ -388,29 +418,27 @@ class TestDisplayMethods:
         assert "converter" in text.lower()
         assert "v.1.0.0" in text
 
-    def test_ask_again_enter_and_quit(self, monkeypatch):
+    def test_ask_again_enter_and_quit(self):
         """ask_again should return True for Enter and False for 'q'"""
         console = Console(record=True)
-        ui = RetroCLI(console=console)
-
-        # Enter -> True
-        monkeypatch.setattr("view.keyboard.readchar.readchar", lambda: "\r")
+        
+        # Test Enter -> True
+        keyboard_reader = keyboard_from_string("ENTER")
+        ui = RetroCLI(console=console, keyboard_reader=keyboard_reader)
         assert ui.ask_again() is True
 
-        # 'q' -> False
-        monkeypatch.setattr("view.keyboard.readchar.readchar", lambda: "q")
+        # Test 'q' -> False
+        keyboard_reader = keyboard_from_string("q")
+        ui = RetroCLI(console=console, keyboard_reader=keyboard_reader)
         assert ui.ask_again() is False
 
-    def test_ask_again_ignores_other_keys(self, monkeypatch):
+    def test_ask_again_ignores_other_keys(self):
         """ask_again should ignore unrelated keys until a valid one is pressed"""
         console = Console(record=True)
-        ui = RetroCLI(console=console)
-
-        seq = ["x", "\n"]
-        def fake_read():
-            return seq.pop(0)
-
-        monkeypatch.setattr("view.keyboard.readchar.readchar", fake_read)
+        
+        # Sequence: x (ignored), ENTER (accepted)
+        keyboard_reader = keyboard_from_string("x ENTER")
+        ui = RetroCLI(console=console, keyboard_reader=keyboard_reader)
         assert ui.ask_again() is True
 
 
@@ -421,39 +449,34 @@ class TestInteractiveSelection:
     @staticmethod
     def _paths_to_file_data(paths):
         """Convert Path objects to file data dicts for view."""
-        from domain.model.file import File
         return [File.from_path(p).to_dict() for p in paths]
     
-    @patch('view.keyboard.readchar.readchar')
-    def test_select_files_enter_immediately(self, mock_readchar, tmp_path):
+    def test_select_files_enter_immediately(self, tmp_path):
         """Test selecting files by pressing enter immediately (no selection)"""
         files = [tmp_path / f"file{i}.pdf" for i in range(3)]
         for f in files:
             f.touch()
         
         # Simulate pressing Enter immediately
-        mock_readchar.return_value = "\r"
-        
+        keyboard_reader = keyboard_from_string("ENTER")
         console = Console(record=True)
-        ui = RetroCLI(console=console)
+        ui = RetroCLI(console=console, keyboard_reader=keyboard_reader)
         
         file_data = self._paths_to_file_data(files)
         selected = ui.select_files(file_data)
         
         assert selected == []
     
-    @patch('view.keyboard.readchar.readchar')
-    def test_select_files_space_then_enter(self, mock_readchar, tmp_path):
+    def test_select_files_space_then_enter(self, tmp_path):
         """Test selecting file with space then enter"""
         files = [tmp_path / f"file{i}.pdf" for i in range(2)]
         for f in files:
             f.touch()
         
         # Simulate: space (select), enter (confirm)
-        mock_readchar.side_effect = [" ", "\r"]
-        
+        keyboard_reader = keyboard_from_string("SPACE ENTER")
         console = Console(record=True)
-        ui = RetroCLI(console=console)
+        ui = RetroCLI(console=console, keyboard_reader=keyboard_reader)
         
         file_data = self._paths_to_file_data(files)
         selected = ui.select_files(file_data)
@@ -461,22 +484,16 @@ class TestInteractiveSelection:
         assert len(selected) == 1
         assert selected[0] == 0  # First file index
     
-    @patch('view.keyboard.readchar.readchar')
-    def test_select_files_down_arrow(self, mock_readchar, tmp_path):
+    def test_select_files_down_arrow(self, tmp_path):
         """Test navigating with down arrow"""
         files = [tmp_path / f"file{i}.pdf" for i in range(3)]
         for f in files:
             f.touch()
         
-        # Simulate: down arrow (escape sequence), space, enter
-        mock_readchar.side_effect = [
-            "\x1b", "[", "B",  # Down arrow
-            " ",                # Space to select
-            "\r"                # Enter
-        ]
-        
+        # Simulate: down arrow, space, enter
+        keyboard_reader = keyboard_from_string("DOWN SPACE ENTER")
         console = Console(record=True)
-        ui = RetroCLI(console=console)
+        ui = RetroCLI(console=console, keyboard_reader=keyboard_reader)
         
         file_data = self._paths_to_file_data(files)
         selected = ui.select_files(file_data)
@@ -485,22 +502,16 @@ class TestInteractiveSelection:
         assert len(selected) == 1
         assert selected[0] == 1
     
-    @patch('view.keyboard.readchar.readchar')
-    def test_select_files_up_arrow(self, mock_readchar, tmp_path):
-        """Test navigating with up arrow"""
+    def test_select_files_up_arrow(self, tmp_path):
+        """Test navigating with up arrow (wraps to end)"""
         files = [tmp_path / f"file{i}.pdf" for i in range(3)]
         for f in files:
             f.touch()
         
         # Simulate: up arrow (wraps to last), space, enter
-        mock_readchar.side_effect = [
-            "\x1b", "[", "A",  # Up arrow (wraps around)
-            " ",                # Space to select
-            "\r"                # Enter
-        ]
-        
+        keyboard_reader = keyboard_from_string("UP SPACE ENTER")
         console = Console(record=True)
-        ui = RetroCLI(console=console)
+        ui = RetroCLI(console=console, keyboard_reader=keyboard_reader)
         
         file_data = self._paths_to_file_data(files)
         selected = ui.select_files(file_data)
@@ -509,17 +520,15 @@ class TestInteractiveSelection:
         assert len(selected) == 1
         assert selected[0] == 2  # Last file index
     
-    @patch('view.keyboard.readchar.readchar')
-    def test_select_files_toggle_on_off(self, mock_readchar, tmp_path):
+    def test_select_files_toggle_on_off(self, tmp_path):
         """Test toggling selection on and off"""
         files = [tmp_path / "file.pdf"]
         files[0].touch()
         
         # Simulate: space (select), space (deselect), enter
-        mock_readchar.side_effect = [" ", " ", "\r"]
-        
+        keyboard_reader = keyboard_from_string("SPACE SPACE ENTER")
         console = Console(record=True)
-        ui = RetroCLI(console=console)
+        ui = RetroCLI(console=console, keyboard_reader=keyboard_reader)
         
         file_data = self._paths_to_file_data(files)
         selected = ui.select_files(file_data)
@@ -527,18 +536,16 @@ class TestInteractiveSelection:
         # Should be deselected
         assert selected == []
     
-    @patch('view.keyboard.readchar.readchar')
-    def test_select_files_select_all(self, mock_readchar, tmp_path):
+    def test_select_files_select_all(self, tmp_path):
         """Test selecting all with 'a' key - should select but not confirm"""
         files = [tmp_path / f"file{i}.pdf" for i in range(3)]
         for f in files:
             f.touch()
         
         # Simulate: 'a' (select all), enter (confirm)
-        mock_readchar.side_effect = ["a", "\r"]
-        
+        keyboard_reader = keyboard_from_string("a ENTER")
         console = Console(record=True)
-        ui = RetroCLI(console=console)
+        ui = RetroCLI(console=console, keyboard_reader=keyboard_reader)
         
         file_data = self._paths_to_file_data(files)
         selected = ui.select_files(file_data)
@@ -560,24 +567,22 @@ class TestInteractiveSelection:
         
         file_data = self._paths_to_file_data(files)
         # Should raise SystemExit
-        import pytest
         with pytest.raises(SystemExit) as exc_info:
             ui.select_files(file_data)
         
         assert exc_info.value.code == 0
     
-    @patch('view.keyboard.readchar.readchar')
-    def test_select_files_all_toggle_deselect(self, mock_readchar, tmp_path):
+    def test_select_files_all_toggle_deselect(self, tmp_path):
         """Test [A] pressed twice toggles: select all then deselect all"""
         files = [tmp_path / f"file{i}.pdf" for i in range(3)]
         for f in files:
             f.touch()
         
         # Simulate: 'a' (select all), 'a' (deselect all), enter
-        mock_readchar.side_effect = ["a", "a", "\r"]
+        keyboard_input = keyboard_from_string("a a ENTER")
         
         console = Console(record=True)
-        ui = RetroCLI(console=console)
+        ui = RetroCLI(console=console, keyboard_reader=keyboard_input)
         
         file_data = self._paths_to_file_data(files)
         selected = ui.select_files(file_data)
@@ -585,18 +590,17 @@ class TestInteractiveSelection:
         # Should be empty after toggle
         assert len(selected) == 0
     
-    @patch('view.keyboard.readchar.readchar')
-    def test_select_files_all_continues_loop(self, mock_readchar, tmp_path):
+    def test_select_files_all_continues_loop(self, tmp_path):
         """Test [A] selects all but allows further navigation before confirm"""
         files = [tmp_path / f"file{i}.pdf" for i in range(3)]
         for f in files:
             f.touch()
         
         # Simulate: 'a' (select all), space (deselect current), enter
-        mock_readchar.side_effect = ["a", " ", "\r"]
+        keyboard_input = keyboard_from_string("a SPACE ENTER")
         
         console = Console(record=True)
-        ui = RetroCLI(console=console)
+        ui = RetroCLI(console=console, keyboard_reader=keyboard_input)
         
         file_data = self._paths_to_file_data(files)
         
@@ -797,39 +801,26 @@ def test_retrocli_basic_rendering():
 class TestMergeModeSelection:
     """Test merge mode selection UI"""
     
-    def test_select_merge_mode_navigation(self, monkeypatch):
+    def test_select_merge_mode_navigation(self):
         """Test _select_merge_mode with arrow key navigation"""
         console = Console(record=True)
-        ui = RetroCLI(console=console)
         
         # Simulate: down arrow, down arrow, enter (selects "per_page")
-        key_sequence = [
-            "\x1b", "[", "B",  # Down arrow
-            "\x1b", "[", "B",  # Down arrow
-            "\r"               # Enter
-        ]
-        key_iter = iter(key_sequence)
+        keyboard_input = keyboard_from_string("DOWN DOWN ENTER")
         
-        import readchar
-        monkeypatch.setattr(readchar, "readchar", lambda: next(key_iter))
+        ui = RetroCLI(console=console, keyboard_reader=keyboard_input)
         
         result = ui._select_merge_mode()
         assert result == MergeMode.PER_PAGE
     
-    def test_select_merge_mode_up_arrow_wrapping(self, monkeypatch):
+    def test_select_merge_mode_up_arrow_wrapping(self):
         """Test _select_merge_mode with up arrow wrapping to end"""
         console = Console(record=True)
-        ui = RetroCLI(console=console)
         
         # Simulate: up arrow (wraps to last), enter
-        key_sequence = [
-            "\x1b", "[", "A",  # Up arrow (wraps to per_page)
-            "\r"               # Enter
-        ]
-        key_iter = iter(key_sequence)
+        keyboard_input = keyboard_from_string("UP ENTER")
         
-        import readchar
-        monkeypatch.setattr(readchar, "readchar", lambda: next(key_iter))
+        ui = RetroCLI(console=console, keyboard_reader=keyboard_input)
         
         result = ui._select_merge_mode()
         assert result == MergeMode.PER_PAGE
@@ -837,54 +828,38 @@ class TestMergeModeSelection:
 class TestOutputFormatSelection:
     """Test output format selection UI"""
     
-    def test_select_output_format_navigation(self, monkeypatch):
+    def test_select_output_format_navigation(self):
         """Test _select_output_format with arrow key navigation"""
         console = Console(record=True)
-        ui = RetroCLI(console=console)
         
         # Simulate: down arrow, down arrow, enter (selects json = 3)
-        key_sequence = [
-            "\x1b", "[", "B",  # Down arrow
-            "\x1b", "[", "B",  # Down arrow
-            "\r"               # Enter
-        ]
-        key_iter = iter(key_sequence)
+        keyboard_input = keyboard_from_string("DOWN DOWN ENTER")
         
-        import readchar
-        monkeypatch.setattr(readchar, "readchar", lambda: next(key_iter))
+        ui = RetroCLI(console=console, keyboard_reader=keyboard_input)
         
         result = ui._select_output_format()
         assert result == OutputFormat.JSON
     
-    def test_select_output_format_up_arrow_wrapping(self, monkeypatch):
+    def test_select_output_format_up_arrow_wrapping(self):
         """Test _select_output_format with up arrow wrapping to end"""
         console = Console(record=True)
-        ui = RetroCLI(console=console)
         
         # Simulate: up arrow (wraps to json), enter
-        key_sequence = [
-            "\x1b", "[", "A",  # Up arrow (wraps to json)
-            "\r"               # Enter
-        ]
-        key_iter = iter(key_sequence)
+        keyboard_input = keyboard_from_string("UP ENTER")
         
-        import readchar
-        monkeypatch.setattr(readchar, "readchar", lambda: next(key_iter))
+        ui = RetroCLI(console=console, keyboard_reader=keyboard_input)
         
         result = ui._select_output_format()
         assert result == OutputFormat.JSON
     
-    def test_select_output_format_default_selection(self, monkeypatch):
+    def test_select_output_format_default_selection(self):
         """Test _select_output_format with immediate enter (selects plain text = 1)"""
         console = Console(record=True)
-        ui = RetroCLI(console=console)
         
         # Simulate: enter (selects default plain text)
-        key_sequence = ["\r"]
-        key_iter = iter(key_sequence)
+        keyboard_input = keyboard_from_string("ENTER")
         
-        import readchar
-        monkeypatch.setattr(readchar, "readchar", lambda: next(key_iter))
+        ui = RetroCLI(console=console, keyboard_reader=keyboard_input)
         
         result = ui._select_output_format()
         assert result == OutputFormat.PLAIN_TEXT

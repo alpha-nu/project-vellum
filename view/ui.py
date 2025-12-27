@@ -14,7 +14,7 @@ from rich.align import Align
 from typing import Optional
 from enum import Enum
 from view.interface import UIInterface
-from view.keyboard import KeyboardKey, read_keyboard_key
+from view.keyboard import KeyboardKey
 
 
 class MergeMode(Enum):
@@ -144,7 +144,8 @@ class StyledDescriptionColumn(TextColumn):
 
 
 class RetroCLI(UIInterface):
-    def __init__(self, console: Optional[Console] = None, max_width: int = 120, colors: Optional[dict] = None):
+    def __init__(self, console: Optional[Console] = None, max_width: int = 120, colors: Optional[dict] = None, keyboard_reader=None):
+        super().__init__(keyboard_reader=keyboard_reader)
         self.max_width = max_width
         self.console = console or Console()
         # Color scheme: primary (purple) for main text, subtle (grey) for borders,
@@ -266,7 +267,7 @@ class RetroCLI(UIInterface):
                 )
             )
 
-            token = read_keyboard_key()
+            token = self.keyboard_reader()
 
             if token.key == KeyboardKey.UP:
                 current_index = (current_index - 1) % len(file_data)
@@ -369,7 +370,7 @@ class RetroCLI(UIInterface):
                 )
             )
 
-            token = read_keyboard_key()
+            token = self.keyboard_reader()
 
             if token.key == KeyboardKey.UP:
                 current_index = (current_index - 1) % len(options)
@@ -436,7 +437,7 @@ class RetroCLI(UIInterface):
                 )
             )
 
-            token = read_keyboard_key()
+            token = self.keyboard_reader()
 
             if token.key == KeyboardKey.UP:
                 current_index = (current_index - 1) % len(options)
@@ -570,7 +571,7 @@ class RetroCLI(UIInterface):
 
     def ask_again(self):
         while True:
-            token = read_keyboard_key()
+            token = self.keyboard_reader()
             if token.key == KeyboardKey.ENTER:
                 return True
             elif token.key == KeyboardKey.CHAR and token.char == "q":

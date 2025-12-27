@@ -1,12 +1,23 @@
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Callable
 from pathlib import Path
+
+from view.keyboard import read_keyboard_key
 
 
 class UIInterface(ABC):
     """Abstract interface for the UI/View layer to facilitate testing and
     dependency injection.
     """
+
+    def __init__(self, keyboard_reader: Optional[Callable] = None):
+        """Initialize UIInterface with optional keyboard reader dependency.
+        
+        Args:
+            keyboard_reader: Optional callable that returns KeyboardToken on each call.
+                           If not provided, the default read_keyboard_key will be used.
+        """
+        self.keyboard_reader = keyboard_reader or read_keyboard_key
 
     @abstractmethod
     def print_center(self, renderable):
