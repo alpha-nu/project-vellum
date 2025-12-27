@@ -46,6 +46,21 @@ def keyboard_from_string(input_str):
     return lambda: next(iterator)
 
 
+# ===== Time Provider Mock Helper =====
+
+def time_provider_sequence(*times):
+    """Create a time provider that returns a sequence of time values.
+    
+    Args:
+        *times: Sequence of float time values to return on successive calls
+    
+    Returns:
+        A callable time provider that returns the next time value
+    """
+    iterator = iter(times)
+    return lambda: next(iterator)
+
+
 class TestRetroCLIBasics:
     """Test basic RetroCLI initialization and utility methods"""
     
@@ -161,20 +176,21 @@ class TestProgressColumns:
     
     def test_styled_time_elapsed_column_converting(self):
         """Test time elapsed column during conversion"""
-        column = StyledTimeElapsedColumn("cyan")
+        # Use deterministic time provider: start=100.0, current=105.0 (5 seconds elapsed)
+        time_provider = time_provider_sequence(105.0)
+        column = StyledTimeElapsedColumn("cyan", time_provider=time_provider)
         
         # Create mock task with start time
         task = Mock()
-        start_time = time.perf_counter() - 5.0  # Started 5 seconds ago
         task.fields = {
             "status": "converting",
             "filename": "test.pdf",
-            "start_time": start_time
+            "start_time": 100.0  # Started at time 100.0
         }
         
         result = column.render(task)
-        # Should show elapsed time (approximately 5 seconds)
-        assert "00:0" in str(result)
+        # Should show 5 seconds (105.0 - 100.0 = 5.0)
+        assert "00:05" in str(result)
     
     def test_styled_time_elapsed_column_done(self):
         """Test time elapsed column when done"""

@@ -1,3 +1,4 @@
+import time
 from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
@@ -62,10 +63,11 @@ class OutputFormat(Enum):
 
 
 class _StyledTimeMixin:
-    def __init__(self, style: str, attr: str):
+    def __init__(self, style: str, attr: str, time_provider=time.perf_counter):
         super().__init__()
         self._style = style
         self._attr = attr
+        self._time_provider = time_provider
 
     def render(self, task):
         value = getattr(task, self._attr)
@@ -83,8 +85,8 @@ class _StyledTimeMixin:
         return f"{minutes:02d}:{seconds:02d}"
 
 class StyledTimeElapsedColumn(_StyledTimeMixin, TimeRemainingColumn):
-    def __init__(self, style: str):
-        _StyledTimeMixin.__init__(self, style, "elapsed")
+    def __init__(self, style: str, time_provider=None):
+        _StyledTimeMixin.__init__(self, style, "elapsed", time_provider=time_provider)
     
     def render(self, task):
         fields = getattr(task, "fields", {}) or {}
@@ -101,8 +103,7 @@ class StyledTimeElapsedColumn(_StyledTimeMixin, TimeRemainingColumn):
         if status == "converting":
             start_time = fields.get("start_time")
             if start_time is not None:
-                import time
-                elapsed = time.perf_counter() - start_time
+                elapsed = self._time_provider() - start_time
                 return Text(f"{self._format_time(elapsed)}", style=self._style)
         
         # Pending or no start time
