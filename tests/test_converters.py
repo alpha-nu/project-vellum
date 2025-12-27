@@ -1,10 +1,12 @@
-"""
-Enhanced tests for converter classes to increase coverage.
+"""Enhanced tests for converter classes to increase coverage.
 Tests PDF and ePub converters with mocked dependencies.
 """
 from pathlib import Path
 from unittest.mock import Mock, MagicMock, patch
-from model.converters import PDFConverter, EPubConverter, PyMuPDFReader, EbookLibReader
+from domain.converters.pdf_converter import PDFConverter
+from domain.converters.epub_converter import EPubConverter
+from domain.converters.pdf_reader import PyMuPDFReader
+from domain.converters.epub_reader import EbookLibReader
 
 
 class TestPDFConverter:
@@ -69,8 +71,8 @@ class TestPDFConverter:
         mock_reader.open.return_value = mock_doc
         
         # Mock pytesseract and PIL
-        with patch('model.converters.pytesseract') as mock_tesseract, \
-             patch('model.converters.Image') as mock_image:
+        with patch('domain.converters.pdf_converter.pytesseract') as mock_tesseract, \
+             patch('domain.converters.pdf_converter.Image') as mock_image:
             mock_tesseract.image_to_string.return_value = "OCR extracted text"
             
             # Test
@@ -160,8 +162,8 @@ class TestPDFConverter:
         mock_reader.open.return_value = mock_doc
         
         # Mock pytesseract and PIL
-        with patch('model.converters.pytesseract') as mock_tesseract, \
-             patch('model.converters.Image') as mock_image:
+        with patch('domain.converters.pdf_converter.pytesseract') as mock_tesseract, \
+             patch('domain.converters.pdf_converter.Image') as mock_image:
             mock_tesseract.image_to_string.return_value = "OCR page content"
             
             # Test
@@ -380,9 +382,8 @@ class TestPDFConverterOCREdgeCases:
         mock_reader.open.return_value = mock_doc
         
         # Mock pytesseract and PIL
-        with patch('model.converters.pytesseract') as mock_tesseract, \
-             patch('model.converters.Image') as mock_image:
-            mock_tesseract.image_to_string.return_value = ""
+        with patch('domain.converters.pdf_converter.pytesseract') as mock_tesseract, \
+             patch('domain.converters.pdf_converter.Image') as mock_image:
             
             # Test
             converter = PDFConverter(Path("ocr_test.pdf"), reader=mock_reader)

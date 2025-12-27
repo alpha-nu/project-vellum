@@ -3,7 +3,9 @@ Enhanced tests for model layer to increase coverage.
 Tests converters and output handlers with various scenarios.
 """
 import json
-from model.outputs import PlainTextHandler, MarkdownHandler, JSONHandler
+from domain.outputs.plain_text_handler import PlainTextHandler
+from domain.outputs.markdown_handler import MarkdownHandler
+from domain.outputs.json_handler import JSONHandler
 
 
 class TestPlainTextHandler:

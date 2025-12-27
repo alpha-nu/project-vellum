@@ -12,9 +12,13 @@ from typing import List, Optional
 import time
 from view.interface import UIInterface
 from view.ui import MergeMode, OutputFormat
-from model.converters import PDFConverter, EPubConverter
-from model.outputs import PlainTextHandler, MarkdownHandler, JSONHandler, OutputHandler
-from model.file import File
+from domain.converters.pdf_converter import PDFConverter
+from domain.converters.epub_converter import EPubConverter
+from domain.outputs.plain_text_handler import PlainTextHandler
+from domain.outputs.markdown_handler import MarkdownHandler
+from domain.outputs.json_handler import JSONHandler
+from domain.core.output_handler import OutputHandler
+from domain.model.file import File
 
 
 from enum import Enum

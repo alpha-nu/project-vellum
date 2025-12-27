@@ -1,6 +1,8 @@
+"""Abstract base class for document converters."""
 import abc
 from pathlib import Path
 from typing import Optional, Callable, List
+
 
 class BaseConverter(metaclass=abc.ABCMeta):
     """Abstract Base Class for all document converters."""
@@ -15,7 +17,7 @@ class BaseConverter(metaclass=abc.ABCMeta):
         so callers can surface per-page or per-item progress. Implementations
         must accept the parameter but may ignore it.
         """
-        pass
+        raise NotImplementedError("Subclasses must implement extract_content()")
 
     @abc.abstractmethod
     def extract_content_per_item(self, progress_callback: Optional[Callable[[int, int], None]] = None) -> List[str]:
@@ -24,21 +26,4 @@ class BaseConverter(metaclass=abc.ABCMeta):
         Returns:
             List of strings, one per page (PDF) or chapter (EPUB)
         """
-        pass
-
-class OutputHandler(metaclass=abc.ABCMeta):
-    """Abstract Base Class for different output formats."""
-    @abc.abstractmethod
-    def save(self, content: str, destination: Path):
-        pass
-
-    @abc.abstractmethod
-    def save_multiple(self, contents: List[str], destination: Path, source_name: str):
-        """Save multiple content pieces (pages/chapters) as separate numbered files.
-        
-        Args:
-            contents: List of content strings to save
-            destination: Base path for output files
-            source_name: Original source file name for naming output files
-        """
-        pass
+        raise NotImplementedError("Subclasses must implement extract_content_per_item()")

@@ -421,7 +421,7 @@ class TestInteractiveSelection:
     @staticmethod
     def _paths_to_file_data(paths):
         """Convert Path objects to file data dicts for view."""
-        from model.file import File
+        from domain.model.file import File
         return [File.from_path(p).to_dict() for p in paths]
     
     @patch('view.keyboard.readchar.readchar')

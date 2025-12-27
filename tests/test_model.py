@@ -1,6 +1,6 @@
 from pathlib import Path
 from typing import List
-from model.core import BaseConverter
+from domain.core.base_converter import BaseConverter
 
 
 class FakeConverter(BaseConverter):

@@ -580,7 +580,7 @@ class TestControllerPerPageMode:
             def show_conversion_summary(self, *a, **k):
                 pass
         
-        from model.outputs import PlainTextHandler
+        from domain.outputs.plain_text_handler import PlainTextHandler
         
         monkeypatch.setattr(
             "controller.converter_controller.ConverterController.get_converter",
@@ -612,7 +612,7 @@ class TestFormatHandlerFactory:
         
         handler = controller.get_format_handler(OutputFormat.PLAIN_TEXT)
         
-        from model.outputs import PlainTextHandler
+        from domain.outputs.plain_text_handler import PlainTextHandler
         assert isinstance(handler, PlainTextHandler)
     
     def test_get_format_handler_markdown(self, tmp_path):
@@ -622,7 +622,7 @@ class TestFormatHandlerFactory:
         
         handler = controller.get_format_handler(OutputFormat.MARKDOWN)
         
-        from model.outputs import MarkdownHandler
+        from domain.outputs.markdown_handler import MarkdownHandler
         assert isinstance(handler, MarkdownHandler)
     
     def test_get_format_handler_json(self, tmp_path):
@@ -632,7 +632,7 @@ class TestFormatHandlerFactory:
         
         handler = controller.get_format_handler(OutputFormat.JSON)
         
-        from model.outputs import JSONHandler
+        from domain.outputs.json_handler import JSONHandler
         assert isinstance(handler, JSONHandler)
     
     def test_get_format_handler_invalid_format(self, tmp_path):

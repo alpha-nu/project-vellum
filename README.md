@@ -103,11 +103,12 @@ pytest tests/ -v --cov=. --cov-report=term --cov-report=html
 
 **Run specific test modules:**
 ```bash
-pytest tests/test_controller.py -v    # Controller layer
-pytest tests/test_converters.py -v    # Document converters
-pytest tests/test_outputs.py -v       # Output formatters
-pytest tests/test_view.py -v          # UI components
-pytest tests/test_model.py -v         # Model utilities
+pytest tests/core/ -v               # Abstract base classes
+pytest tests/converters/ -v         # Document readers and converters
+pytest tests/outputs/ -v            # Output formatters
+pytest tests/model/ -v              # Data models
+pytest tests/test_controller.py -v  # Controller orchestration
+pytest tests/test_view.py -v        # CLI interface
 ```
 
 **Quick test run (no coverage):**
@@ -115,16 +116,15 @@ pytest tests/test_model.py -v         # Model utilities
 pytest tests/ -v --no-cov
 ```
 
-### Test Structure
+### Test Organization
 
-```
-tests/
-├── test_controller.py    # Controller orchestration and workflow
-├── test_converters.py    # PDF/ePub extraction engines
-├── test_outputs.py       # Plain text, Markdown, JSON handlers
-├── test_view.py          # CLI interface and user interactions
-└── test_model.py         # Model layer utilities
-```
+Tests are organized to mirror the `domain/` module structure, with one test file per class:
+
+- **tests/core/** - Abstract base class tests (BaseConverter, OutputHandler)
+- **tests/converters/** - Reader and converter tests (PyMuPDFReader, EbookLibReader, PDFConverter, EPubConverter)
+- **tests/outputs/** - Output handler tests (PlainTextHandler, MarkdownHandler, JSONHandler)
+- **tests/model/** - Data model tests (File)
+- **tests/** - Integration tests (controller, UI, keyboard navigation)
 
 ### Coverage Reports
 
@@ -179,43 +179,53 @@ Vellum implements **Model-View-Controller (MVC)** with strict separation of conc
 ```
 vellum/
 ├── main.py                      # Entry point
-├── controller/
-│   └── converter_controller.py  # Orchestration logic
-├── model/
-│   ├── core.py                  # Abstract base classes
-│   ├── converters.py            # PDF/ePub extraction engines
-│   ├── outputs.py               # Format handlers
-│   └── file.py                  # File model with metadata
-├── view/
-│   ├── interface.py             # UI interface contract
-│   └── ui.py                    # Rich-based terminal UI
-└── tests/
-    ├── test_controller.py       # Controller tests
-    ├── test_converters.py       # Converter tests
-    ├── test_outputs.py          # Output handler tests
-    ├── test_view.py             # UI tests
-    └── test_model.py            # Model utilities tests
+├── controller/                  # Orchestration layer
+│   └── converter_controller.py  # Workflow coordination
+├── domain/                      # Core business logic (no __init__.py in subfolders)
+│   ├── core/                    # Abstract base classes
+│   │   ├── base_converter.py
+│   │   └── output_handler.py
+│   ├── converters/              # Document extraction engines
+│   │   ├── reader_protocols.py  # Dependency injection contracts
+│   │   ├── pdf_reader.py & epub_reader.py
+│   │   ├── pdf_converter.py & epub_converter.py
+│   ├── outputs/                 # Format handlers (Plain Text, Markdown, JSON)
+│   └── model/                   # Data models (File metadata)
+├── view/                        # Presentation layer
+│   ├── interface.py & ui.py     # Terminal UI implementation
+├── tests/                       # Test suite (mirrors domain structure)
+└── requirements.txt
 ```
+
+**Design Notes:**
+- **Domain layer isolation:** All business logic lives in `domain/` with no circular dependencies
+- **No package `__init__.py`:** Subfolders use direct module imports for clarity
+- **Test organization:** One test file per class, organized by module
 
 ### Design Patterns
 
 - **MVC Architecture:** Clean separation between business logic, UI, and orchestration
+- **Domain-Driven Design:** Domain layer (`domain/`) contains all business logic
+- **Flat Module Structure:** No package __init__.py files required for subfolders, direct imports from module files
 - **Abstract Base Classes:** `BaseConverter` and `OutputHandler` enable easy extension
-- **Dependency Injection:** Controller receives UI interface for testability
+- **Dependency Injection:** Protocols (`_PDFReader`, `_EPubReader`) enable testable dependencies
+- **Factory Pattern:** `get_format_handler()` creates output handlers without hardcoding
+- **Protocol-Based Design:** Readers are injected as protocols for clean testing
 - **Model Layer:** `File` model encapsulates file metadata and presentation logic
 - **View Passivity:** UI only displays primitive data, no business logic
 
 ### Extensibility
 
 **Adding a new document type:**
-1. Create `NewTypeConverter(BaseConverter)` in `model/converters.py`
-2. Implement `extract_content() → str`
-3. Update `CONVERTER_MAP` in `controller/converter_controller.py`
+1. Create `NewReader` implementing the reader protocol in `domain/converters/new_reader.py`
+2. Create `NewTypeConverter(BaseConverter)` in `domain/converters/new_converter.py`
+3. Implement `extract_content()` and `extract_content_per_item()`
+4. Update `get_converter()` in `controller/converter_controller.py`
 
 **Adding a new output format:**
-1. Create `NewFormatHandler(OutputHandler)` in `model/outputs.py`
-2. Implement `save(content: str, destination: Path)`
-3. Update `FORMAT_HANDLERS` in `controller/converter_controller.py`
+1. Create `NewFormatHandler(OutputHandler)` in `domain/outputs/new_format_handler.py`
+2. Implement `save()` and `save_multiple()` methods
+3. Update `get_format_handler()` in `controller/converter_controller.py`
 4. Update UI format options in `view/ui.py`
 
 ---

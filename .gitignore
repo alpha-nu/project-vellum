@@ -209,5 +209,6 @@ __marimo__/
 # Local
 /data
 todos.md
-cli_testing_tips.md
+cli_testing_*
+code_audit*
 
