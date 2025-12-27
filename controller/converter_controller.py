@@ -198,7 +198,7 @@ class ConverterController:
         self, 
         files: List[Path], 
         handler: OutputHandler, 
-        merge_mode: str
+        merge_mode: MergeMode
     ) -> tuple[List[str], int, int]:
         """
         Process all files with progress tracking.
@@ -206,7 +206,7 @@ class ConverterController:
         Args:
             files: List of files to process
             handler: Output format handler
-            merge_mode: One of "no_merge", "merge", or "per_page"
+            merge_mode: MergeMode enum value (NO_MERGE, MERGE, or PER_PAGE)
             
         Returns:
             Tuple of (accumulator, output_count, total_output_size)
@@ -255,7 +255,7 @@ class ConverterController:
         task_id: int, 
         progress, 
         handler: OutputHandler, 
-        merge_mode: str
+        merge_mode: MergeMode
     ) -> tuple[Optional[str], int, int]:
         """
         Process a single file with progress tracking.
