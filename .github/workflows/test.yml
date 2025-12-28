@@ -59,7 +59,7 @@ jobs:
       run: |
         mkdir -p coverage
         mv htmlcov/* coverage/
-        rm -rf htmlcov
+        rmdir htmlcov
 
     - name: Upload Pages artifact (coverage)
       uses: actions/upload-pages-artifact@v3
