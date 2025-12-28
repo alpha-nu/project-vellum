@@ -31,13 +31,25 @@ Vellum is optimized for **Python 3.13**
 
 Docker is the recommended way to run Vellum, as it packages the Tesseract OCR engine and all language training data.
 
+1.  **Pull the Image:**
+    ```bash
+    docker pull ghcr.io/alpha-nu/project-vellum/vellum:latest
+    ```
+
+2.  **Run with Volume Mapping:**
+    Map your local folder containing your documents to the container's `/data` directory.
+    ```bash
+    docker run -it -v "/path/to/your/docs:/data" ghcr.io/alpha-nu/project-vellum/vellum:latest
+    ```
+
+Alternatively, you can build the image locally:
+
 1.  **Build the Image:**
     ```bash
     docker build -t vellum-converter .
     ```
 
 2.  **Run with Volume Mapping:**
-    Map your local folder containing your documents to the container's `/data` directory.
     ```bash
     docker run -it -v "/path/to/your/docs:/data" vellum-converter
     ```
