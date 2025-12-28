@@ -1,6 +1,7 @@
 """Shared fixtures and mock classes for controller tests."""
 
 from contextlib import contextmanager
+from unittest.mock import MagicMock
 import pytest
 from view.ui import MergeMode, OutputFormat
 
@@ -101,8 +102,11 @@ class MockUIBuilder:
         
         class TestUI:
             def __init__(self):
-                self.ask_calls = 0
                 self.update_count = 0
+                self.show_error = MagicMock()
+                self.show_conversion_summary = MagicMock()
+                # ask_again returns True on first call (if configured), False thereafter
+                self.ask_again = MagicMock(side_effect=[builder.run_again, False] if builder.run_again else [False])
             
             def draw_header(self):
                 pass
@@ -134,16 +138,6 @@ class MockUIBuilder:
                     tracker.update_count = 0
                     yield tracker
                 return _ctx()
-            
-            def show_error(self, msg):
-                builder.errors.append(msg)
-            
-            def show_conversion_summary(self, *a, **k):
-                builder.summaries.append(k)
-            
-            def ask_again(self):
-                self.ask_calls += 1
-                return builder.run_again if self.ask_calls == 1 else False
         
         return TestUI()
 
@@ -157,10 +151,16 @@ class MockPathBuilder:
     
     def __init__(self, path_str: str = "/test/path"):
         self.path_str = path_str
+        self._exists = True
         self._is_dir = False
         self._suffix = ".pdf"
         self._files = []
         self._stem = "test"
+        self._stat_size = 1000
+    
+    def with_exists(self, exists: bool):
+        self._exists = exists
+        return self
     
     def with_is_dir(self, is_dir: bool):
         self._is_dir = is_dir
@@ -179,11 +179,21 @@ class MockPathBuilder:
         self._files = files
         return self
     
+    def with_stat_size(self, size: int):
+        self._stat_size = size
+        return self
+    
     def build(self):
         """Build the mock Path object."""
         builder = self
         
+        class MockStat:
+            st_size = builder._stat_size
+        
         class MockPath:
+            def exists(self):
+                return builder._exists
+            
             def is_dir(self):
                 return builder._is_dir
             
@@ -192,14 +202,67 @@ class MockPathBuilder:
                 return builder._suffix
             
             @property
+            def stem(self):
+                return builder._stem
+            
+            @property
             def name(self):
                 return f"{builder._stem}{builder._suffix}"
             
             def iterdir(self):
                 """Iterate over child files/directories."""
                 yield from builder._files
+            
+            def stat(self):
+                return MockStat()
+            
+            def with_suffix(self, suffix: str):
+                new_builder = MockPathBuilder(builder.path_str)
+                new_builder._exists = builder._exists
+                new_builder._is_dir = builder._is_dir
+                new_builder._suffix = suffix
+                new_builder._stem = builder._stem
+                new_builder._files = builder._files
+                new_builder._stat_size = builder._stat_size
+                return new_builder.build()
+            
+            def with_name(self, name: str):
+                # Parse name into stem and suffix
+                if '.' in name:
+                    stem, suffix = name.rsplit('.', 1)
+                    suffix = '.' + suffix
+                else:
+                    stem, suffix = name, ''
+                new_builder = MockPathBuilder(builder.path_str)
+                new_builder._exists = builder._exists
+                new_builder._is_dir = builder._is_dir
+                new_builder._suffix = suffix
+                new_builder._stem = stem
+                new_builder._files = builder._files
+                new_builder._stat_size = builder._stat_size
+                return new_builder.build()
+            
+            def __truediv__(self, other: str):
+                new_builder = MockPathBuilder(f"{builder.path_str}/{other}")
+                new_builder._exists = True
+                new_builder._is_dir = False
+                new_builder._stem = other
+                new_builder._suffix = ''
+                return new_builder.build()
+            
+            def __str__(self):
+                return builder.path_str
+            
+            def __fspath__(self):
+                """Support os.fspath() and Path() conversion."""
+                return builder.path_str
         
         return MockPath()
+    
+    def build_factory(self):
+        """Build a factory function that returns this mock path."""
+        mock_path = self.build()
+        return lambda path_str: mock_path
 
 
 # ============================================================================
@@ -215,6 +278,17 @@ def mock_converters():
 @pytest.fixture
 def mock_handlers():
     """Provide mock handlers dictionary for isolated unit tests."""
-    return {OutputFormat.PLAIN_TEXT: MockHandler}
+    return {
+        OutputFormat.PLAIN_TEXT: MockHandler,
+        OutputFormat.MARKDOWN: MockHandler,
+        OutputFormat.JSON: MockHandler,
+    }
+
+
+@pytest.fixture
+def mock_pdf_path():
+    """Provide a path factory that returns a standard mock PDF path."""
+    mock_path = MockPathBuilder().with_suffix(".pdf").with_stem("test").build()
+    return lambda s: mock_path
 
 
