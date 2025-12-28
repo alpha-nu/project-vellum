@@ -55,10 +55,16 @@ jobs:
         curl "https://img.shields.io/badge/coverage-${COVERAGE}%25-${COLOR}" > htmlcov/badge.svg
         test -f htmlcov/badge.svg || (echo "badge.svg not created" && exit 1)
 
-    - name: Upload Pages artifact (htmlcov)
+    - name: Prepare coverage for Pages
+      run: |
+        mkdir -p coverage
+        mv htmlcov/* coverage/
+        rmdir htmlcov
+
+    - name: Upload Pages artifact (coverage)
       uses: actions/upload-pages-artifact@v3
       with:
-        path: ./htmlcov
+        path: ./coverage
 
     - name: Deploy to GitHub Pages
       id: deploy
