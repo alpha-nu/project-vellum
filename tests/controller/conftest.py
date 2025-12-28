@@ -7,54 +7,6 @@ from view.ui import MergeMode, OutputFormat
 
 
 # ============================================================================
-# Mock Converters
-# ============================================================================
-
-class MockConverter:
-    """Base mock converter for testing."""
-    
-    def __init__(self, path, content="dummy"):
-        self.path = path
-        self.content = content
-    
-    def extract_content(self, progress_callback=None):
-        if progress_callback:
-            progress_callback(1, 1)
-        return self.content
-    
-    def extract_content_per_item(self, progress_callback=None):
-        if progress_callback:
-            progress_callback(1, 1)
-        return ["page1", "page2", "page3"]
-
-
-# ============================================================================
-# Mock Handlers
-# ============================================================================
-
-class MockHandler:
-    """Base mock output handler that captures saves in memory."""
-    
-    def __init__(self):
-        self.saved_files = {}  # Track what was saved: {path: content}
-    
-    def save(self, content, destination):
-        """Capture save without writing to disk."""
-        self.saved_files[destination] = content
-        # Return mock size
-        return len(content) if content else 0
-    
-    def save_multiple(self, contents, destination, source_name):
-        """Mock save_multiple that tracks pages in memory."""
-        self.saved_files[destination] = contents
-        return 100  # Mock size
-    
-    def get_saved_content(self, destination):
-        """Helper to retrieve what was saved."""
-        return self.saved_files.get(destination)
-
-
-# ============================================================================
 # Mock UI Builder
 # ============================================================================
 
@@ -67,10 +19,6 @@ class MockUIBuilder:
         self.merge_mode = MergeMode.NO_MERGE
         self.merged_filename = None
         self.run_again = False
-        self.selected_indices = None
-        self.errors = []
-        self.summaries = []
-        self.progress_exception_on_update = None
     
     def with_format(self, fmt):
         self.format_choice = fmt
@@ -86,14 +34,6 @@ class MockUIBuilder:
     
     def with_run_again(self, should_run=True):
         self.run_again = should_run
-        return self
-    
-    def with_selected_indices(self, indices):
-        self.selected_indices = indices
-        return self
-    
-    def with_progress_exception_on_update(self, update_count):
-        self.progress_exception_on_update = update_count
         return self
     
     def build(self):
@@ -118,9 +58,7 @@ class MockUIBuilder:
                 return builder.file_path, builder.format_choice, builder.merge_mode, builder.merged_filename
             
             def select_files(self, file_data):
-                if builder.selected_indices is not None:
-                    return builder.selected_indices
-                return list(range(len(file_data)))  # Select all by default
+                return list(range(len(file_data)))
             
             def get_progress_bar(self):
                 @contextmanager
@@ -130,13 +68,9 @@ class MockUIBuilder:
                             return 1
                         
                         def update(self, *a, **kw):
-                            self.update_count += 1
-                            if builder.progress_exception_on_update == self.update_count:
-                                raise RuntimeError("Progress update failed!")
+                            pass
                     
-                    tracker = ProgressTracker()
-                    tracker.update_count = 0
-                    yield tracker
+                    yield ProgressTracker()
                 return _ctx()
         
         return TestUI()
@@ -270,19 +204,30 @@ class MockPathBuilder:
 # ============================================================================
 
 @pytest.fixture
-def mock_converters():
-    """Provide mock converters dictionary for isolated unit tests."""
-    return {'.pdf': MockConverter, '.epub': MockConverter}
+def mock_converter():
+    """Returns a converter factory that creates MagicMock converters."""
+    def converter_factory(path, *args, **kwargs):
+        mock = MagicMock()
+        mock.path = path
+        mock.extract_content = MagicMock(return_value="dummy")
+        mock.extract_content_per_item = MagicMock(return_value=["page1", "page2", "page3"])
+        return mock
+    return converter_factory
 
 
 @pytest.fixture
-def mock_handlers():
-    """Provide mock handlers dictionary for isolated unit tests."""
-    return {
-        OutputFormat.PLAIN_TEXT: MockHandler,
-        OutputFormat.MARKDOWN: MockHandler,
-        OutputFormat.JSON: MockHandler,
-    }
+def mock_handler():
+    """Returns a MagicMock handler instance."""
+    mock = MagicMock()
+    mock.save = MagicMock(return_value=5)
+    mock.save_multiple = MagicMock(return_value=100)
+    return mock
+
+
+@pytest.fixture
+def mock_converters(mock_converter):
+    """Provide mock converters dictionary."""
+    return {'.pdf': mock_converter, '.epub': mock_converter}
 
 
 @pytest.fixture
