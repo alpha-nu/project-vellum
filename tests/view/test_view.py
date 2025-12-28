@@ -8,6 +8,7 @@ from unittest.mock import Mock, MagicMock, patch
 from rich.console import Console
 from rich.text import Text
 
+from view.merge_mode import MergeMode
 from view.ui import (
     RetroCLI,
     StyledTimeElapsedColumn,
@@ -15,7 +16,7 @@ from view.ui import (
     StyledDescriptionColumn,
     _StyledTimeMixin,
 )
-from view.ui import MergeMode, OutputFormat
+from view.output_format import OutputFormat
 from view.keyboard import KeyboardToken, KeyboardKey
 
 from domain.model.file import File

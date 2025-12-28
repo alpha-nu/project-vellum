@@ -5,7 +5,8 @@ from pytest import raises
 from unittest.mock import patch, MagicMock
 from controller.converter_controller import ConverterController, NextAction
 from tests.controller.conftest import MockUIBuilder, MockPathBuilder
-from view.ui import MergeMode, OutputFormat
+from view.merge_mode import MergeMode
+from view.output_format import OutputFormat
 
 
 class TestGetConverter:

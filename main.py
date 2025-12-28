@@ -3,7 +3,8 @@ Vellum - Document extraction engine for PDFs and ePubs.
 
 Entry point for the application. Delegates all business logic to the controller.
 """
-from view.ui import RetroCLI, OutputFormat
+from view.output_format import OutputFormat
+from view.ui import RetroCLI
 from view.keyboard import read_char
 from controller.converter_controller import ConverterController
 from domain.converters.pdf_converter import PDFConverter

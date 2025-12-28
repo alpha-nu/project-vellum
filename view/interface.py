@@ -14,7 +14,7 @@ class UIInterface(ABC):
         pass
 
     @abstractmethod
-    def input_center(self, prompt_symbol: str = ">>: ") -> str:
+    def input_center(self, prompt_symbol: str) -> str:
         pass
 
     @abstractmethod

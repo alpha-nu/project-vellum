@@ -10,8 +10,9 @@ This controller orchestrates the conversion process, handling:
 from pathlib import Path
 from typing import List, Optional, Dict, Type, Callable, Protocol, Iterator, runtime_checkable
 import time
+from view.merge_mode import MergeMode
 from view.interface import UIInterface
-from view.ui import MergeMode, OutputFormat
+from view.output_format import OutputFormat
 from domain.core.output_handler import OutputHandler
 from domain.core.base_converter import BaseConverter
 from domain.model.file import File

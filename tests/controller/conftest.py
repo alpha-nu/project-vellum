@@ -3,7 +3,8 @@
 from contextlib import contextmanager
 from unittest.mock import MagicMock
 import pytest
-from view.ui import MergeMode, OutputFormat
+from view.merge_mode import MergeMode
+from view.output_format import OutputFormat
 
 
 # ============================================================================

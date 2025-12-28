@@ -13,53 +13,10 @@ from contextlib import contextmanager
 from rich.table import Table
 from rich.align import Align
 from typing import Optional
-from enum import Enum
+from view.output_format import OutputFormat
+from view.merge_mode import MergeMode
 from view.interface import UIInterface
 from view.keyboard import KeyboardKey
-
-
-class MergeMode(Enum):
-    NO_MERGE = "no_merge"
-    MERGE = "merge"
-    PER_PAGE = "per_page"
-    
-    @property
-    def display_name(self) -> str:
-        return {
-            MergeMode.NO_MERGE: "no merge",
-            MergeMode.MERGE: "merge",
-            MergeMode.PER_PAGE: "file per page"
-        }[self]
-    
-    @property
-    def display_hint(self) -> str:
-        return {
-            MergeMode.NO_MERGE: "(separate file per document)",
-            MergeMode.MERGE: "(combine all into single file)",
-            MergeMode.PER_PAGE: "(one file per page/chapter)"
-        }[self]
-
-
-class OutputFormat(Enum):
-    PLAIN_TEXT = "txt"
-    MARKDOWN = "md"
-    JSON = "json"
-    
-    @property
-    def extension(self) -> str:
-        return f".{self.value}"
-    
-    @property
-    def display_name(self) -> str:
-        return {
-            OutputFormat.PLAIN_TEXT: "plain text",
-            OutputFormat.MARKDOWN: "markdown",
-            OutputFormat.JSON: "json"
-        }[self]
-    
-    @property
-    def display_hint(self) -> str:
-        return f"({self.extension})"
 
 
 class _StyledTimeMixin:
@@ -86,7 +43,7 @@ class _StyledTimeMixin:
 
 class StyledTimeElapsedColumn(_StyledTimeMixin, TimeRemainingColumn):
     def __init__(self, style: str, time_provider=None):
-        _StyledTimeMixin.__init__(self, style, "elapsed", time_provider=time_provider)
+        _StyledTimeMixin.__init__(self, style, "elapsed", time_provider=time_provider or time.perf_counter)
     
     def render(self, task):
         fields = getattr(task, "fields", {}) or {}
@@ -164,6 +121,92 @@ class RetroCLI(UIInterface):
     def keyboard_reader(self):
         return self._keyboard_reader
 
+    @property
+    def panel_width(self) -> int:
+        """Compute constrained panel width based on terminal and max width."""
+        return min(self.max_width, self.console.size.width)
+
+    def _create_panel(self, content, title: Optional[str] = None, padding: Optional[tuple] = None, title_color: Optional[str] = None) -> Panel:
+        """Create a styled panel with consistent settings."""
+        color = title_color or "primary"
+        kwargs = {
+            "border_style": self.colors["subtle"],
+            "width": self.panel_width,
+        }
+        if title:
+            kwargs["title"] = f"[{self.colors[color]}]\\[{title}][/]"
+            kwargs["title_align"] = "left"
+        if padding:
+            kwargs["padding"] = padding
+        return Panel(content, **kwargs)
+
+    def _create_hint_panel(self, hints: str) -> Panel:
+        """Create a panel for keyboard navigation hints."""
+        return Panel(
+            f"[{self.colors['primary']}]{hints}[/]",
+            border_style=self.colors["subtle"],
+            width=self.panel_width,
+        )
+
+    def _create_selection_table(self) -> Table:
+        """Create a pre-configured table for selection menus."""
+        table = Table(
+            show_header=False,
+            width=self.panel_width - 4,
+            show_edge=False,
+        )
+        table.add_column("option", style=self.colors["subtle"])
+        return table
+
+    def _render_radio_row(self, is_current: bool, display_name: str, hint: str) -> str:
+        """Render a radio button row for selection menus."""
+        if is_current:
+            marker = f"[{self.colors['secondary']}]►[/]"
+            radio = f"[{self.colors['secondary']}]●[/]"
+            text = f"[{self.colors['secondary']}]{display_name}[/] [{self.colors['secondary']}]{hint}[/]"
+        else:
+            marker = " "
+            radio = "○"
+            text = f"[{self.colors['primary']}]{display_name}[/] {hint}"
+        return f"{marker} {radio} {text}"
+
+    def _radio_select(self, options: list, title: str):
+        """Generic radio-button selection menu.
+        
+        Args:
+            options: List of enum values with display_name and display_hint properties
+            title: Panel title text
+            
+        Returns:
+            Selected option from the list
+        """
+        current_index = 0
+        hints = f"[{self.colors['secondary']}]⬆︎ /⬇︎[/] :navigate  [{self.colors['secondary']}][ENTER][/]:confirm"
+        
+        while True:
+            self.console.clear()
+            self.draw_header()
+
+            table = self._create_selection_table()
+            for i, option in enumerate(options):
+                table.add_row(self._render_radio_row(
+                    i == current_index, 
+                    option.display_name, 
+                    option.display_hint
+                ))
+
+            self.print_center(self._create_panel(table, title=title, padding=(1, 0, 0, 0)))
+            self.print_center(self._create_hint_panel(hints))
+
+            token = self.keyboard_reader()
+
+            if token.key == KeyboardKey.UP:
+                current_index = (current_index - 1) % len(options)
+            elif token.key == KeyboardKey.DOWN:
+                current_index = (current_index + 1) % len(options)
+            elif token.key == KeyboardKey.ENTER:
+                return options[current_index]
+
     def print_center(self, renderable):
         """Print a renderable centered within the configured console width."""
         term_width = self.console.size.width
@@ -171,9 +214,7 @@ class RetroCLI(UIInterface):
 
     def input_center(self, prompt_symbol=">>: "):
         term_width = self.console.size.width
-        panel_width = min(self.max_width, term_width)
-
-        left_padding = (term_width - panel_width) // 2
+        left_padding = (term_width - self.panel_width) // 2
         prompt_str = " " * left_padding + prompt_symbol
         markup = f"[{self.colors['primary']}]" + prompt_str + "[/]"
         return self.console.input(markup, markup=True)
@@ -209,7 +250,7 @@ class RetroCLI(UIInterface):
                     )
                 ),
                 border_style=self.colors["subtle"],
-                width=min(self.max_width, self.console.size.width),
+                width=self.panel_width,
             )
         )
 
@@ -224,19 +265,13 @@ class RetroCLI(UIInterface):
         """
         selected_indices = []
         current_index = 0
+        hints = f"[{self.colors['secondary']}]⬆︎ /⬇︎[/] :navigate  [{self.colors['secondary']}][SPACE][/]:select  [{self.colors['secondary']}][A][/]:all  [{self.colors['secondary']}][ENTER][/]:confirm  [{self.colors['secondary']}][Q][/]:quit"
+        
         while True:
             self.console.clear()
             self.draw_header()
 
-            panel_width = min(self.max_width, self.console.size.width)
-            table_width = panel_width - 4
-
-            table = Table(
-                show_header=False,
-                width=table_width,
-                show_edge=False,
-            )
-            table.add_column("file", style=self.colors["subtle"])
+            table = self._create_selection_table()
 
             for i, file_info in enumerate(file_data):
                 checkbox = "✔" if i in selected_indices else "❏"
@@ -252,23 +287,8 @@ class RetroCLI(UIInterface):
                     size_text = f"[{self.colors['subtle']}]({file_info['size']})[/]"
                 table.add_row(f"{marker} {checkbox_colored} {filename_text} {size_text}")
 
-            self.print_center(
-                Panel(
-                    table,
-                    padding=(1, 0, 0, 0),
-                    title=f"[{self.colors['primary']}]\\[select files for conversion][/]",
-                    title_align="left",
-                    border_style=self.colors["subtle"],
-                    width=panel_width,
-                )
-            )
-            self.print_center(
-                Panel(
-                    f"[{self.colors['primary']}][{self.colors["secondary"]}]⬆︎ /⬇︎[/] :navigate  [{self.colors["secondary"]}][SPACE][/]:select  [{self.colors["secondary"]}][A][/]:all  [{self.colors["secondary"]}][ENTER][/]:confirm  [{self.colors["secondary"]}][Q][/]:quit[/]",
-                    border_style=self.colors["subtle"],
-                    width=panel_width,
-                )
-            )
+            self.print_center(self._create_panel(table, title="select files for conversion", padding=(1, 0, 0, 0)))
+            self.print_center(self._create_hint_panel(hints))
 
             token = self.keyboard_reader()
 
@@ -307,168 +327,32 @@ class RetroCLI(UIInterface):
         self.console.clear()
         self.draw_header()
 
-        path_prompt = Panel(
-            f"[{self.colors['primary']}]provide a file or directory path[/] [{self.colors['secondary']}](e.g. source.pdf or /data)[/]",
-            border_style=self.colors["subtle"],
-            width=min(self.max_width, self.console.size.width),
-        )
-        self.print_center(path_prompt)
-        path_str = self.input_center()
-        return path_str
+        prompt = f"[{self.colors['primary']}]provide a file or directory path[/] [{self.colors['secondary']}](e.g. source.pdf or /data)[/]"
+        self.print_center(self._create_panel(prompt))
+        return self.input_center()
 
     def _select_output_format(self) -> OutputFormat:
-        """
-        Interactive output format selection menu with radio button options.
-        
-        Returns:
-            Selected OutputFormat enum value
-        """
-        options = [
-            OutputFormat.PLAIN_TEXT,
-            OutputFormat.MARKDOWN,
-            OutputFormat.JSON,
-        ]
-        current_index = 0  # Default to plain text
-        
-        while True:
-            self.console.clear()
-            self.draw_header()
-
-            panel_width = min(self.max_width, self.console.size.width)
-            table_width = panel_width - 4
-
-            table = Table(
-                show_header=False,
-                width=table_width,
-                show_edge=False,
-            )
-            table.add_column("option", style=self.colors["subtle"])
-
-            for i, fmt in enumerate(options):
-                # Radio button: filled if selected, empty if not
-                if i == current_index:
-                    radio = f"[{self.colors['secondary']}]●[/]"
-                    option_text = f"[{self.colors['secondary']}]{fmt.display_name}[/] [{self.colors['secondary']}]{fmt.display_hint}[/]"
-                else:
-                    radio = "○"
-                    option_text = f"[{self.colors['primary']}]{fmt.display_name}[/] {fmt.display_hint}"
-                marker = f"[{self.colors['secondary']}]►[/]" if i == current_index else " "
-                table.add_row(f"{marker} {radio} {option_text}")
-
-            self.print_center(
-                Panel(
-                    table,
-                    padding=(1, 0, 0, 0),
-                    title=f"[{self.colors['primary']}]\\[select output format][/]",
-                    title_align="left",
-                    border_style=self.colors["subtle"],
-                    width=panel_width,
-                )
-            )
-            self.print_center(
-                Panel(
-                    f"[{self.colors['primary']}][{self.colors['secondary']}]⬆︎ /⬇︎[/] :navigate  [{self.colors['secondary']}][ENTER][/]:confirm[/]",
-                    border_style=self.colors["subtle"],
-                    width=panel_width,
-                )
-            )
-
-            token = self.keyboard_reader()
-
-            if token.key == KeyboardKey.UP:
-                current_index = (current_index - 1) % len(options)
-            elif token.key == KeyboardKey.DOWN:
-                current_index = (current_index + 1) % len(options)
-            elif token.key == KeyboardKey.ENTER:
-                # Enter confirms the current selection
-                return options[current_index]
+        """Interactive output format selection menu."""
+        return self._radio_select(
+            [OutputFormat.PLAIN_TEXT, OutputFormat.MARKDOWN, OutputFormat.JSON],
+            title="select output format"
+        )
 
     def _select_merge_mode(self) -> MergeMode:
-        """
-        Interactive merge mode selection menu with radio button options.
-        
-        Returns:
-            One of: MergeMode.NO_MERGE, MergeMode.MERGE, MergeMode.PER_PAGE
-        """
-        options = [
-            MergeMode.NO_MERGE,
-            MergeMode.MERGE,
-            MergeMode.PER_PAGE,
-        ]
-        current_index = 0  # Default to "no_merge"
-        
-        while True:
-            self.console.clear()
-            self.draw_header()
-
-            panel_width = min(self.max_width, self.console.size.width)
-            table_width = panel_width - 4
-
-            table = Table(
-                show_header=False,
-                width=table_width,
-                show_edge=False,
-            )
-            table.add_column("option", style=self.colors["subtle"])
-
-            for i, mode in enumerate(options):
-                # Radio button: filled if selected, empty if not
-                if i == current_index:
-                    radio = f"[{self.colors['secondary']}]●[/]"
-                    option_text = f"[{self.colors['secondary']}]{mode.display_name}[/] [{self.colors['secondary']}]{mode.display_hint}[/]"
-                else:
-                    radio = "○"
-                    option_text = f"[{self.colors['primary']}]{mode.display_name}[/] {mode.display_hint}"
-                marker = f"[{self.colors['secondary']}]►[/]" if i == current_index else " "
-                table.add_row(f"{marker} {radio} {option_text}")
-
-            self.print_center(
-                Panel(
-                    table,
-                    padding=(1, 0, 0, 0),
-                    title=f"[{self.colors['primary']}]\\[select merge mode][/]",
-                    title_align="left",
-                    border_style=self.colors["subtle"],
-                    width=panel_width,
-                )
-            )
-            self.print_center(
-                Panel(
-                    f"[{self.colors['primary']}][{self.colors['secondary']}]⬆︎ /⬇︎[/] :navigate  [{self.colors['secondary']}][ENTER][/]:confirm[/]",
-                    border_style=self.colors["subtle"],
-                    width=panel_width,
-                )
-            )
-
-            token = self.keyboard_reader()
-
-            if token.key == KeyboardKey.UP:
-                current_index = (current_index - 1) % len(options)
-            elif token.key == KeyboardKey.DOWN:
-                current_index = (current_index + 1) % len(options)
-            elif token.key == KeyboardKey.ENTER:
-                # Enter confirms the current selection
-                return options[current_index]
+        """Interactive merge mode selection menu."""
+        return self._radio_select(
+            [MergeMode.NO_MERGE, MergeMode.MERGE, MergeMode.PER_PAGE],
+            title="select merge mode"
+        )
 
     def _prompt_merged_filename(self) -> str:
-        """
-        Prompt user for the name of the merged output file.
-        
-        Returns:
-            The filename entered by the user
-        """
+        """Prompt user for the name of the merged output file."""
         self.console.clear()
         self.draw_header()
 
-        panel_width = min(self.max_width, self.console.size.width)
-        prompt_panel = Panel(
-            f"[{self.colors['primary']}]enter name for merged output file[/] [{self.colors['secondary']}](without extension)[/]",
-            border_style=self.colors["subtle"],
-            width=panel_width,
-        )
-        self.print_center(prompt_panel)
-        filename = self.input_center()
-        return filename.strip()
+        prompt = f"[{self.colors['primary']}]enter name for merged output file[/] [{self.colors['secondary']}](without extension)[/]"
+        self.print_center(self._create_panel(prompt))
+        return self.input_center().strip()
 
     def get_progress_bar(self):
         @contextmanager
@@ -490,15 +374,12 @@ class RetroCLI(UIInterface):
             panel = Panel(
                 progress,
                 border_style=self.colors["subtle"],
-                width=min(self.max_width, self.console.size.width),
+                width=self.panel_width,
             )
             term_width = self.console.size.width
             centered = Align.center(panel, width=term_width)
             with Live(centered, console=self.console, refresh_per_second=10):
-                try:
-                    yield progress
-                finally:
-                    pass
+                yield progress
 
         return _progress_ctx()
 
@@ -506,7 +387,7 @@ class RetroCLI(UIInterface):
         panel = Panel(
             f"[{self.colors[content_color_key]}]{content}[/]",
             border_style=self.colors["subtle"],
-            width=min(self.max_width, self.console.size.width),
+            width=self.panel_width,
         )
         self.print_center(panel)
 
@@ -525,7 +406,6 @@ class RetroCLI(UIInterface):
         single_output_filename: Optional[str] = None
     ):
         """Display comprehensive conversion summary and completion message."""
-        # Format runtime
         runtime_str = f"{total_runtime:.2f}s"
         
         # Determine output description based on merge mode
@@ -536,10 +416,7 @@ class RetroCLI(UIInterface):
         elif merge_mode == MergeMode.PER_PAGE:
             output_desc = f"{output_count} pages/chapters"
         else:  # no_merge
-            if single_output_filename:
-                output_desc = single_output_filename
-            else:
-                output_desc = f"{output_count} files"
+            output_desc = single_output_filename if single_output_filename else f"{output_count} files"
         
         content = (
             f"[{self.colors['primary']}]files processed:{'':<4}[/] [{self.colors['secondary']}]{total_files}[/]\n"
@@ -549,28 +426,15 @@ class RetroCLI(UIInterface):
             f"[{self.colors['accented']}]total runtime:{'':<6} {runtime_str}[/]\n"
         )
         
-        panel = Panel(
-            Text.from_markup(content),
+        self.print_center(self._create_panel(
+            Text.from_markup(content), 
+            title="conversion complete", 
             padding=(1, 0, 0, 0),
-            title=f"[{self.colors['confirm']}]\\[conversion complete][/]",
-            title_align="left",
-            border_style=self.colors["subtle"],
-            width=min(self.max_width, self.console.size.width),
-        )
-        self.print_center(panel)
+            title_color="confirm"
+        ))
 
-        # After showing the summary, provide simple actions for the user
-        actions_hint = (
-            f"[{self.colors['primary']}][{self.colors['secondary']}]"
-            f"[ENTER][/]:run another conversion  [{self.colors['secondary']}][Q][/]:quit"
-        )
-        self.print_center(
-            Panel(
-                actions_hint,
-                border_style=self.colors["subtle"],
-                width=min(self.max_width, self.console.size.width),
-            )
-        )
+        hints = f"[{self.colors['secondary']}][ENTER][/]:run another conversion  [{self.colors['secondary']}][Q][/]:quit"
+        self.print_center(self._create_hint_panel(hints))
 
     def ask_again(self):
         while True:
