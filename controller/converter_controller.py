@@ -8,18 +8,47 @@ This controller orchestrates the conversion process, handling:
 - Progress tracking coordination
 """
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Dict, Type, Callable, Protocol, Iterator, runtime_checkable
 import time
 from view.interface import UIInterface
 from view.ui import MergeMode, OutputFormat
-from domain.converters.pdf_converter import PDFConverter
-from domain.converters.epub_converter import EPubConverter
-from domain.outputs.plain_text_handler import PlainTextHandler
-from domain.outputs.markdown_handler import MarkdownHandler
-from domain.outputs.json_handler import JSONHandler
 from domain.core.output_handler import OutputHandler
+from domain.core.base_converter import BaseConverter
 from domain.model.file import File
 from enum import Enum
+
+
+@runtime_checkable
+class PathLike(Protocol):
+    """Protocol defining the path operations required by the controller."""
+    
+    @property
+    def suffix(self) -> str: ...
+    
+    @property
+    def stem(self) -> str: ...
+    
+    @property
+    def name(self) -> str: ...
+    
+    def exists(self) -> bool: ...
+    
+    def is_dir(self) -> bool: ...
+    
+    def iterdir(self) -> Iterator["PathLike"]: ...
+    
+    def with_suffix(self, suffix: str) -> "PathLike": ...
+    
+    def with_name(self, name: str) -> "PathLike": ...
+    
+    def stat(self) -> object: ...
+    
+    def __truediv__(self, other: str) -> "PathLike": ...
+
+
+ConverterMap = Dict[str, Type[BaseConverter]]
+HandlerMap = Dict[OutputFormat, Type[OutputHandler]]
+PathFactory = Callable[[str], PathLike] 
 
 MERGE_SOURCE_DELIMITER = "\n--- start source: {source} ---\n"
 
@@ -30,22 +59,28 @@ class NextAction(Enum):
 class ConverterController:
     """Controller that orchestrates document conversion workflow."""
     
-    # Supported file extensions and their converter classes
-    CONVERTER_MAP = {
-        ".pdf": PDFConverter,
-        ".epub": EPubConverter,
-    }
-    
-    def __init__(self, ui: UIInterface):
+    def __init__(
+        self, 
+        ui: UIInterface,
+        converters: ConverterMap,
+        handlers: HandlerMap,
+        path_factory: PathFactory
+    ):
         """
-        Initialize the controller with a UI interface.
+        Initialize the controller with a UI interface and dependency maps.
         
         Args:
             ui: UI interface implementing UIInterface abstract class
+            converters: Dictionary mapping file extensions to converter classes
+            handlers: Dictionary mapping OutputFormat to handler classes
+            path_factory: Factory for creating Path objects (defaults to pathlib.Path)
         """
         self.ui = ui
+        self.converters = converters
+        self.handlers = handlers
+        self.path_factory = path_factory
         
-    def get_converter(self, file_path: Path):
+    def _get_converter(self, file_path: PathLike):
         """
         Get appropriate converter for a file based on its extension.
         
@@ -56,10 +91,10 @@ class ConverterController:
             Converter instance or None if extension not supported
         """
         ext = file_path.suffix.lower()
-        converter_class = self.CONVERTER_MAP.get(ext)
+        converter_class = self.converters.get(ext)
         return converter_class(file_path) if converter_class else None
     
-    def get_compatible_files(self, directory: Path) -> List[Path]:
+    def _get_compatible_files(self, directory: PathLike) -> List[PathLike]:
         """
         Scan directory for compatible files.
         
@@ -69,12 +104,13 @@ class ConverterController:
         Returns:
             List of compatible file paths
         """
+        supported_extensions = list(self.converters.keys())
         return [
             f for f in directory.iterdir() 
-            if f.suffix.lower() in self.CONVERTER_MAP.keys()
+            if f.suffix.lower() in supported_extensions
         ]
     
-    def get_format_handler(self, format_choice: OutputFormat) -> OutputHandler:
+    def _get_format_handler(self, format_choice: OutputFormat) -> OutputHandler:
         """
         Factory method for creating output format handlers on-demand.
         
@@ -84,12 +120,7 @@ class ConverterController:
         Returns:
             An instance of the appropriate OutputHandler subclass
         """
-        handlers_map = {
-            OutputFormat.PLAIN_TEXT: PlainTextHandler,
-            OutputFormat.MARKDOWN: MarkdownHandler,
-            OutputFormat.JSON: JSONHandler,
-        }
-        handler_class = handlers_map.get(format_choice)
+        handler_class = self.handlers.get(format_choice)
         if handler_class is None:
             raise ValueError(f"Unknown output format: {format_choice}")
         return handler_class()
@@ -98,10 +129,10 @@ class ConverterController:
         """
         Run the conversion workflow repeatedly while the user opts to restart.
         """
-        while self.run_once() == NextAction.RESTART:
+        while self._run_once() == NextAction.RESTART:
             continue
 
-    def run_once(self) -> NextAction:
+    def _run_once(self) -> NextAction:
         """Perform a single conversion workflow run.
 
         Returns:
@@ -111,7 +142,7 @@ class ConverterController:
 
         # Get user input
         input_str, format_choice, merge_mode, merged_filename = self.ui.get_user_input()
-        input_path = Path(input_str)
+        input_path = self.path_factory(input_str)
 
         # Validate path
         if not input_path.exists():
@@ -129,7 +160,7 @@ class ConverterController:
         self.ui.clear_and_show_header()
 
         # Get output handler
-        handler = self.get_format_handler(format_choice)
+        handler = self._get_format_handler(format_choice)
 
         # Calculate total input size
         total_input_size = sum(file.stat().st_size for file in files)
@@ -174,7 +205,7 @@ class ConverterController:
         return NextAction.RESTART if run_again else NextAction.QUIT
 
     
-    def _get_files_to_process(self, input_path: Path) -> List[Path]:
+    def _get_files_to_process(self, input_path: PathLike) -> List[PathLike]:
         """
         Determine which files to process based on input path.
         
@@ -185,7 +216,7 @@ class ConverterController:
             List of files to process
         """
         if input_path.is_dir():
-            compatible_files = self.get_compatible_files(input_path)
+            compatible_files = self._get_compatible_files(input_path)
             file_data = [File.from_path(path).to_dict() for path in compatible_files]
             selected_indices = self.ui.select_files(file_data)
             return [compatible_files[i] for i in selected_indices]
@@ -194,7 +225,7 @@ class ConverterController:
     
     def _process_files(
         self, 
-        files: List[Path], 
+        files: List[PathLike], 
         handler: OutputHandler, 
         merge_mode: MergeMode
     ) -> tuple[List[str], int, int]:
@@ -249,7 +280,7 @@ class ConverterController:
     
     def _process_single_file(
         self, 
-        file: Path, 
+        file: PathLike, 
         task_id: int, 
         progress, 
         handler: OutputHandler, 
@@ -283,7 +314,7 @@ class ConverterController:
         )
         
         # Get converter
-        converter = self.get_converter(file)
+        converter = self._get_converter(file)
         if not converter:
             return None, 0, 0
         
@@ -336,7 +367,7 @@ class ConverterController:
     
     def _save_merged_output(
         self, 
-        input_path: Path, 
+        input_path: PathLike, 
         handler: OutputHandler, 
         accumulator: List[str],
         format_choice: OutputFormat,

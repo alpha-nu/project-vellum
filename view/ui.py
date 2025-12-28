@@ -149,8 +149,6 @@ class RetroCLI(UIInterface):
         super().__init__(keyboard_reader=keyboard_reader)
         self.max_width = max_width
         self.console = console or Console()
-        # Color scheme: primary (purple) for main text, subtle (grey) for borders,
-        # secondary (cyan) for interactive elements, accented (gold) for progress
         default_colors = {
             "logo": "#c25a1a",       # Orange/rust for the ASCII logo
             "primary": "#e9d8ff",    # Soft purple for primary text and prompts
