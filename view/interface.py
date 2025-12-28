@@ -1,8 +1,5 @@
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional, Callable
-from pathlib import Path
-
-from view.keyboard import read_keyboard_key
 
 
 class UIInterface(ABC):
@@ -10,14 +7,11 @@ class UIInterface(ABC):
     dependency injection.
     """
 
-    def __init__(self, keyboard_reader: Optional[Callable] = None):
-        """Initialize UIInterface with optional keyboard reader dependency.
-        
-        Args:
-            keyboard_reader: Optional callable that returns KeyboardToken on each call.
-                           If not provided, the default read_keyboard_key will be used.
-        """
-        self.keyboard_reader = keyboard_reader or read_keyboard_key
+    @property
+    @abstractmethod
+    def keyboard_reader(self) -> Callable:
+        """Callable that returns KeyboardToken on each call."""
+        pass
 
     @abstractmethod
     def input_center(self, prompt_symbol: str = ">>: ") -> str:

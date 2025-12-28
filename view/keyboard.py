@@ -19,7 +19,7 @@ class KeyboardToken:
     char: Optional[str] = None
 
 
-def read_keyboard_key() -> KeyboardToken:
+def read_char() -> KeyboardToken:
     """Read keys from `readchar` and return a KeyboardToken with an enum key.
 
     Handles ANSI escape sequences for arrow keys and normalizes single characters

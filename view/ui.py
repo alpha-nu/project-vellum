@@ -146,7 +146,7 @@ class StyledDescriptionColumn(TextColumn):
 
 class RetroCLI(UIInterface):
     def __init__(self, console: Optional[Console] = None, max_width: int = 120, colors: Optional[dict] = None, keyboard_reader=None):
-        super().__init__(keyboard_reader=keyboard_reader)
+        self._keyboard_reader = keyboard_reader
         self.max_width = max_width
         self.console = console or Console()
         default_colors = {
@@ -159,6 +159,10 @@ class RetroCLI(UIInterface):
             "error": "#ff6b81",      # Rosy red for error messages
         }
         self.colors = {**default_colors, **(colors or {})}
+
+    @property
+    def keyboard_reader(self):
+        return self._keyboard_reader
 
     def print_center(self, renderable):
         """Print a renderable centered within the configured console width."""
@@ -252,7 +256,7 @@ class RetroCLI(UIInterface):
                 Panel(
                     table,
                     padding=(1, 0, 0, 0),
-                    title=f"[{self.colors['primary']}]\[select files for conversion][/]",
+                    title=f"[{self.colors['primary']}]\\[select files for conversion][/]",
                     title_align="left",
                     border_style=self.colors["subtle"],
                     width=panel_width,
@@ -355,7 +359,7 @@ class RetroCLI(UIInterface):
                 Panel(
                     table,
                     padding=(1, 0, 0, 0),
-                    title=f"[{self.colors['primary']}]\[select output format][/]",
+                    title=f"[{self.colors['primary']}]\\[select output format][/]",
                     title_align="left",
                     border_style=self.colors["subtle"],
                     width=panel_width,
@@ -422,7 +426,7 @@ class RetroCLI(UIInterface):
                 Panel(
                     table,
                     padding=(1, 0, 0, 0),
-                    title=f"[{self.colors['primary']}]\[select merge mode][/]",
+                    title=f"[{self.colors['primary']}]\\[select merge mode][/]",
                     title_align="left",
                     border_style=self.colors["subtle"],
                     width=panel_width,
@@ -548,7 +552,7 @@ class RetroCLI(UIInterface):
         panel = Panel(
             Text.from_markup(content),
             padding=(1, 0, 0, 0),
-            title=f"[{self.colors['confirm']}]\[conversion complete][/]",
+            title=f"[{self.colors['confirm']}]\\[conversion complete][/]",
             title_align="left",
             border_style=self.colors["subtle"],
             width=min(self.max_width, self.console.size.width),

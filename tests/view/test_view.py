@@ -577,9 +577,10 @@ class TestInteractiveSelection:
         
         # Simulate: 'q' (quit)
         mock_readchar.return_value = "q"
+        keyboard_reader = keyboard_from_string("q")
         
         console = Console(record=True)
-        ui = RetroCLI(console=console)
+        ui = RetroCLI(console=console, keyboard_reader=keyboard_reader)
         
         file_data = self._paths_to_file_data(files)
         # Should raise SystemExit

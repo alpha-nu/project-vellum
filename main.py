@@ -4,6 +4,7 @@ Vellum - Document extraction engine for PDFs and ePubs.
 Entry point for the application. Delegates all business logic to the controller.
 """
 from view.ui import RetroCLI, OutputFormat
+from view.keyboard import read_char
 from controller.converter_controller import ConverterController
 from domain.converters.pdf_converter import PDFConverter
 from domain.converters.epub_converter import EPubConverter
@@ -24,7 +25,7 @@ handlers = {
 }
 
 def main(ui=None):
-    ui = ui or RetroCLI()
+    ui = ui or RetroCLI(keyboard_reader=read_char)
     controller = ConverterController(
         ui,
         converters=converters,
