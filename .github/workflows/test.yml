@@ -79,4 +79,4 @@ jobs:
       with:
         context: .
         push: true
-        tags: project-vellum:latest
+        tags: ghcr.io/${{ github.repository }}/vellum:latest
