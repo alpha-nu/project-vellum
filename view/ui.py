@@ -429,7 +429,7 @@ class RetroCLI(UIInterface):
         self.print_center(self._create_panel(
             Text.from_markup(content), 
             title="conversion complete", 
-            padding=(1, 0, 0, 0),
+            padding=(1, 0, 0, 1),
             title_color="confirm"
         ))
 
