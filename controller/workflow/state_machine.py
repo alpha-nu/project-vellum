@@ -1,17 +1,20 @@
 from dataclasses import dataclass, field
+from typing import Any, Optional, List
 
 # Holds all mutable, shared workflow data
 @dataclass
 class WorkflowContext:
-    input_path: any = None
-    format_choice: any = None
-    merge_mode: any = None
-    files: list = field(default_factory=list)
-    handler: any = None
-    merged_filename: any = None
+    input_path: Optional[Any] = None
+    format_choice: Optional[Any] = None
+    merge_mode: Optional[Any] = None
+    files: List[Any] = field(default_factory=list)
+    handler: Optional[Any] = None
+    merged_filename: Optional[str] = None
+    error_message: Optional[str] = None
+    error_origin: Optional['WorkflowState'] = None
     # Add more fields as needed for workflow
 from enum import Enum, auto
-from typing import Callable, Dict, Optional, List, Any
+from typing import Callable, Dict
 from dataclasses import dataclass
 
 class WorkflowState(Enum):
@@ -21,6 +24,7 @@ class WorkflowState(Enum):
     FILES_SELECTION = auto()
     PROCESSING = auto()
     COMPLETE = auto()
+    ERROR = auto()
 
 
 @dataclass(frozen=True)
@@ -35,6 +39,7 @@ WORKFLOW_TRANSITIONS: Dict[WorkflowState, StateTransition] = {
     WorkflowState.FILES_SELECTION: StateTransition(WorkflowState.PROCESSING, WorkflowState.MERGE_MODE_SELECTION),
     WorkflowState.PROCESSING: StateTransition(WorkflowState.COMPLETE, None),
     WorkflowState.COMPLETE: StateTransition(WorkflowState.SOURCE_INPUT, None),
+    WorkflowState.ERROR: StateTransition(WorkflowState.SOURCE_INPUT, None),
 }
 
 

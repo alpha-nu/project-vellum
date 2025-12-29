@@ -312,10 +312,10 @@ class RetroCLI(UIInterface):
                 import sys
                 sys.exit(0)
 
+        self.console.clear()
+        self.draw_header()
+
         return selected_indices
-
-
-
 
     def get_path_input(self) -> str:
         """Get path input from user."""
@@ -428,10 +428,10 @@ class RetroCLI(UIInterface):
             title_color="confirm"
         ))
 
-        hints = f"[{self.colors['secondary']}][ENTER][/]:run another conversion  [{self.colors['secondary']}][Q][/]:quit"
-        self.print_center(self._create_hint_panel(hints))
 
     def ask_again(self):
+        hints = f"[{self.colors['secondary']}][ENTER][/]:run another conversion  [{self.colors['secondary']}][Q][/]:quit"
+        self.print_center(self._create_hint_panel(hints))
         while True:
             token = self.keyboard_reader()
             if token.key == KeyboardKey.ENTER:
@@ -440,5 +440,3 @@ class RetroCLI(UIInterface):
                 return False
             # Else continue waiting
 
-    # Note: legacy private/test helpers removed — use public API methods:
-    # `input_center()`, `select_output_format()`, `select_merge_mode()`, `prompt_merged_filename()`

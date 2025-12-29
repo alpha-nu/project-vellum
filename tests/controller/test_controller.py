@@ -7,6 +7,7 @@ from controller.converter_controller import ConverterController, NextAction
 from tests.controller.conftest import MockUIBuilder, MockPathBuilder
 from view.merge_mode import MergeMode
 from view.output_format import OutputFormat
+from controller.workflow.state_machine import WorkflowState
 
 
 class TestGetConverter:
@@ -102,10 +103,13 @@ class TestRunOnce:
         path_factory = MockPathBuilder().with_exists(False).build_factory()
         controller = ConverterController(ui, mock_converters, handlers, path_factory)
         
-        # Run one step and assert error shown
+        # First step transitions to ERROR, second step handles/display the error
         controller.run(loop=False)
+        result = controller.run(loop=False)
+
         ui.show_error.assert_called_once()
         assert "path not found" in ui.show_error.call_args[0][0]
+        assert result is False
     
     def test_no_compatible_files_shows_error_and_quits(self, mock_converters, mock_handler):
         ui = MockUIBuilder("/some/dir").build()
@@ -128,7 +132,8 @@ class TestRunOnce:
         controller.run(loop=False)  # SOURCE_INPUT
         controller.run(loop=False)  # FORMAT_SELECTION
         controller.run(loop=False)  # MERGE_MODE_SELECTION
-        controller.run(loop=False)  # FILES_SELECTION -> should trigger error
+        controller.run(loop=False)  # FILES_SELECTION -> set ERROR
+        controller.run(loop=False)  # ERROR -> show error and ask_again
         ui.show_error.assert_called_once()
         assert "no compatible files found" in ui.show_error.call_args[0][0]
     
@@ -182,6 +187,52 @@ class TestRunOnce:
         result = controller.run(loop=False)
 
         assert result is False
+
+    def test_error_retry_restores_origin(self, mock_converters, mock_handler):
+        """If an ERROR has an origin, retrying should return to that state."""
+        ui = MockUIBuilder("/some/dir").with_run_again(True).build()
+        handlers = {OutputFormat.PLAIN_TEXT: lambda: mock_handler}
+
+        mock_path = (
+            MockPathBuilder("/some/dir")
+            .with_exists(True)
+            .with_is_dir(True)
+            .with_files([
+                MockPathBuilder().with_suffix(".txt").with_stem("readme").build(),
+            ])
+            .build()
+        )
+        path_factory = lambda s: mock_path
+        controller = ConverterController(ui, mock_converters, handlers, path_factory)
+
+        # Drive to FILES_SELECTION which will set ERROR
+        controller.run(loop=False)  # SOURCE_INPUT
+        controller.run(loop=False)  # FORMAT_SELECTION
+        controller.run(loop=False)  # MERGE_MODE_SELECTION
+        controller.run(loop=False)  # FILES_SELECTION -> sets ERROR
+
+        # Handle ERROR: ask_again -> True, should restore to FILES_SELECTION
+        result = controller.run(loop=False)
+
+        assert result is True
+        assert controller.state_machine.get_state() == WorkflowState.FILES_SELECTION
+
+    def test_error_retry_with_no_origin_resets(self, mock_converters, mock_handler):
+        """If an ERROR has no origin, retry should reset the workflow."""
+        ui = MockUIBuilder().with_run_again(True).build()
+        handlers = {OutputFormat.PLAIN_TEXT: lambda: mock_handler}
+
+        controller = ConverterController(ui, mock_converters, handlers, lambda s: None)
+
+        # Manually set ERROR state with no origin
+        controller.state_machine.context.error_message = "transient"
+        controller.state_machine.context.error_origin = None
+        controller.state_machine.state = WorkflowState.ERROR
+
+        result = controller.run(loop=False)
+
+        assert result is True
+        assert controller.state_machine.get_state() == WorkflowState.SOURCE_INPUT
 
 
 class TestGetFilesToProcess:

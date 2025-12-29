@@ -323,9 +323,7 @@ class TestDisplayMethods:
         assert "output created:      3 files" in text
         assert "total runtime:       45.67s" in text
         assert "input size:          2.0MB" in text
-        # Keybinding hint should be present for running again or quitting
-        assert "run another conversion" in text
-        assert "quit" in text
+        # Keybinding hints moved to `ask_again()`; summary no longer contains them
         
         # Clear console for next test
         console.clear()

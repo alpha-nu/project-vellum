@@ -59,11 +59,12 @@ class ConverterController:
             False to indicate the workflow should stop. When `loop` is True, returns None.
         """
         def run_once() -> bool:
-            self.ui.draw_header()
             current_state = self.state_machine.get_state()
 
             if current_state == WorkflowState.SOURCE_INPUT:
                 self._handle_source_input()
+            elif current_state == WorkflowState.ERROR:
+                return self._handle_error()
             elif current_state == WorkflowState.FORMAT_SELECTION:
                 self._handle_format_selection()
             elif current_state == WorkflowState.MERGE_MODE_SELECTION:
@@ -305,7 +306,10 @@ class ConverterController:
         input_path = self.path_factory(input_str)
 
         if not input_path.exists():
-            self.ui.show_error("fatal error: path not found")
+            ctx = self.state_machine.context
+            ctx.error_message = "path not found"
+            ctx.error_origin = WorkflowState.SOURCE_INPUT
+            self.state_machine.state = WorkflowState.ERROR
             return 
 
         self.state_machine.context.input_path = input_path
@@ -328,12 +332,13 @@ class ConverterController:
         files = self._get_files_to_process(input_path)
         
         if not files:
-            self.ui.show_error("no compatible files found")
-            self.state_machine.reset() 
+            ctx = self.state_machine.context
+            ctx.error_message = "no compatible files found"
+            ctx.error_origin = WorkflowState.FILES_SELECTION
+            self.state_machine.state = WorkflowState.ERROR
             return
 
         self.state_machine.context.files = files
-        self.ui.clear_and_show_header() 
         self.state_machine.next()
 
     def _handle_processing(self):
@@ -386,4 +391,30 @@ class ConverterController:
             return True
         else:
             self.state_machine.next() 
+            return False
+
+    def _handle_error(self) -> bool:
+        """Handle transient errors: show message and use `ask_again()` for retry/quit.
+
+        Returns:
+            True to continue (restart), False to stop the run loop (quit).
+        """
+        msg = self.state_machine.context.error_message
+        self.ui.show_error(msg)
+        run_again = self.ui.ask_again()
+
+        if run_again:
+            # On retry, return to the originating state if available.
+            origin = self.state_machine.context.error_origin
+            # Clear error fields
+            self.state_machine.context.error_message = None
+            self.state_machine.context.error_origin = None
+
+            if origin is not None:
+                self.state_machine.state = origin
+                return True
+            # Fallback: reset workflow
+            self.state_machine.reset()
+            return True
+        else:
             return False
