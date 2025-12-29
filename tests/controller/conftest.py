@@ -55,8 +55,20 @@ class MockUIBuilder:
             def clear_and_show_header(self):
                 pass
             
+            def get_path_input(self):
+                return builder.file_path
+
             def get_user_input(self):
                 return builder.file_path, builder.format_choice, builder.merge_mode, builder.merged_filename
+            
+            def select_output_format(self):
+                return builder.format_choice
+
+            def select_merge_mode(self):
+                return builder.merge_mode
+
+            def prompt_merged_filename(self):
+                return builder.merged_filename
             
             def select_files(self, file_data):
                 return list(range(len(file_data)))

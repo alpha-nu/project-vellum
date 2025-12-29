@@ -88,9 +88,15 @@ docker run -it -v "/path/to/docs:/data" vellum-converter
 - MarkdownHandler prepends `# SOURCE: {filename}` header
 - JSON output includes nested `source` and `content` fields
 - Progress bar updates on file processing, not extraction completion
+- FOR UNIT TESTING, FOLLWO THESE PRACTICES:
+ - DO NOT write Unit Tests that have side effects (i.e. creatin files, depending on third party tools, or direct dependency on native Python libraries that have side effects)
+ - Favor MOCKING over MonkeyPatching
+
 
 ## Good Agent Practices
 1. ALWAYS run tests after changes you make
 2. ALWAYS make sure the README.md is in sync with every new feature you implement.
-3. ALWAYS check test coverage after changes and ensure it never decreases from the current baseline. If coverage drops, add tests to cover the uncovered lines or refactor to maintain coverage.
+3. ALWAYS check test coverage after changes and ensure it never decreases from the current baseline. If coverage drops, add tests to cover the uncovered lines or refactor to maintain coverage. Minimum threshold for test coverage is 97%
 4. When adding new interactive UI methods that use readchar for input, ensure they are properly tested with mocked input to maintain coverage.
+5. DO NOT add explanatory inline comments
+6. DO NOT add docString comments unless otherwise instructed

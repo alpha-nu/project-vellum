@@ -42,6 +42,11 @@ Docker is the recommended way to run Vellum, as it packages the Tesseract OCR en
     docker run -it -v "/path/to/your/docs:/data" ghcr.io/alpha-nu/project-vellum/vellum:latest
     ```
 
+    The CLI uses true colors, therefore it is recommended to add the `-e "TERM=xterm-256color"` option to the `docker run` command:
+
+    ```bash
+    docker run -it -e "TERM=xterm-256color" -v "/path/to/your/docs:/data" ghcr.io/alpha-nu/project-vellum/vellum:latest
+    ```
 Alternatively, you can build the image locally:
 
 1.  **Build the Image:**

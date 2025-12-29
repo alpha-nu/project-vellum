@@ -7,9 +7,9 @@ This controller orchestrates the conversion process, handling:
 - Merge functionality
 - Progress tracking coordination
 """
-from pathlib import Path
-from typing import List, Optional, Dict, Type, Callable, Protocol, Iterator, runtime_checkable
+from typing import List, Optional, Dict, Type, Callable
 import time
+from controller.path_protocol import PathLike
 from view.merge_mode import MergeMode
 from view.interface import UIInterface
 from view.output_format import OutputFormat
@@ -17,34 +17,7 @@ from domain.core.output_handler import OutputHandler
 from domain.core.base_converter import BaseConverter
 from domain.model.file import File
 from enum import Enum
-
-
-@runtime_checkable
-class PathLike(Protocol):
-    """Protocol defining the path operations required by the controller."""
-    
-    @property
-    def suffix(self) -> str: ...
-    
-    @property
-    def stem(self) -> str: ...
-    
-    @property
-    def name(self) -> str: ...
-    
-    def exists(self) -> bool: ...
-    
-    def is_dir(self) -> bool: ...
-    
-    def iterdir(self) -> Iterator["PathLike"]: ...
-    
-    def with_suffix(self, suffix: str) -> "PathLike": ...
-    
-    def with_name(self, name: str) -> "PathLike": ...
-    
-    def stat(self) -> object: ...
-    
-    def __truediv__(self, other: str) -> "PathLike": ...
+from controller.workflow.state_machine import WorkflowState, WorkflowStateMachine, WorkflowContext
 
 
 ConverterMap = Dict[str, Type[BaseConverter]]
@@ -67,145 +40,52 @@ class ConverterController:
         handlers: HandlerMap,
         path_factory: PathFactory
     ):
-        """
-        Initialize the controller with a UI interface and dependency maps.
-        
-        Args:
-            ui: UI interface implementing UIInterface abstract class
-            converters: Dictionary mapping file extensions to converter classes
-            handlers: Dictionary mapping OutputFormat to handler classes
-            path_factory: Factory for creating Path objects (defaults to pathlib.Path)
-        """
+       
         self.ui = ui
         self.converters = converters
         self.handlers = handlers
         self.path_factory = path_factory
-        
-    def _get_converter(self, file_path: PathLike):
-        """
-        Get appropriate converter for a file based on its extension.
-        
+        self.state_machine = WorkflowStateMachine()
+
+    def run(self, loop: bool = True):
+        """Run the workflow.
+
         Args:
-            file_path: Path to the file to convert
-            
-        Returns:
-            Converter instance or None if extension not supported
-        """
-        ext = file_path.suffix.lower()
-        converter_class = self.converters.get(ext)
-        return converter_class(file_path) if converter_class else None
-    
-    def _get_compatible_files(self, directory: PathLike) -> List[PathLike]:
-        """
-        Scan directory for compatible files.
-        
-        Args:
-            directory: Directory to scan
-            
-        Returns:
-            List of compatible file paths
-        """
-        supported_extensions = list(self.converters.keys())
-        return [
-            f for f in directory.iterdir() 
-            if f.suffix.lower() in supported_extensions
-        ]
-    
-    def _get_format_handler(self, format_choice: OutputFormat) -> OutputHandler:
-        """
-        Factory method for creating output format handlers on-demand.
-        
-        Args:
-            format_choice: The output format to create a handler for
-            
-        Returns:
-            An instance of the appropriate OutputHandler subclass
-        """
-        handler_class = self.handlers.get(format_choice)
-        if handler_class is None:
-            raise ValueError(f"Unknown output format: {format_choice}")
-        return handler_class()
-    
-    def run(self):
-        """
-        Run the conversion workflow repeatedly while the user opts to restart.
-        """
-        while self._run_once() == NextAction.RESTART:
-            continue
-
-    def _run_once(self) -> NextAction:
-        """Perform a single conversion workflow run.
+            loop: If True, run until completion; if False, execute a single state step and
+                  return a boolean indicating whether the workflow should continue.
 
         Returns:
-            NextAction.RESTART if the user wants to run again, otherwise NextAction.QUIT
+            When `loop` is False, returns True to indicate the caller may continue, or
+            False to indicate the workflow should stop. When `loop` is True, returns None.
         """
-        self.ui.draw_header()
+        def run_once() -> bool:
+            self.ui.draw_header()
+            current_state = self.state_machine.get_state()
 
-        # Get user input
-        input_str, format_choice, merge_mode, merged_filename = self.ui.get_user_input()
-        input_path = self.path_factory(input_str)
+            if current_state == WorkflowState.SOURCE_INPUT:
+                self._handle_source_input()
+            elif current_state == WorkflowState.FORMAT_SELECTION:
+                self._handle_format_selection()
+            elif current_state == WorkflowState.MERGE_MODE_SELECTION:
+                self._handle_merge_mode_selection()
+            elif current_state == WorkflowState.FILES_SELECTION:
+                self._handle_files_selection()
+            elif current_state == WorkflowState.PROCESSING:
+                self._handle_processing()
+            elif current_state == WorkflowState.COMPLETE:
+                return self._handle_complete()
 
-        # Validate path
-        if not input_path.exists():
-            self.ui.show_error("fatal error: path not found")
-            return NextAction.QUIT
+            return True
 
-        # Determine files to process
-        files = self._get_files_to_process(input_path)
+        if not loop:
+            return run_once()
 
-        if not files:
-            self.ui.show_error("no compatible files found")
-            return NextAction.QUIT
+        # loop == True: run until a step returns False
+        while True:
+            again = run_once()
+            if not again:
+                break
 
-        # Clear screen and redraw header before processing
-        self.ui.clear_and_show_header()
-
-        # Get output handler
-        handler = self._get_format_handler(format_choice)
-
-        # Calculate total input size
-        total_input_size = sum(file.stat().st_size for file in files)
-
-        # Process files
-        start_time = time.perf_counter()
-        accumulator, output_count, total_output_size = self._process_files(files, handler, merge_mode)
-
-        # Handle output based on merge mode
-        merged_output_filename = None
-        if merge_mode == MergeMode.MERGE and accumulator:
-            merged_output_filename, merge_output_size = self._save_merged_output(input_path, handler, accumulator, format_choice, merged_filename)
-            total_output_size += merge_output_size
-            output_count = 1  # Override with 1 for merged output
-
-        # Show comprehensive conversion summary
-        elapsed = time.perf_counter() - start_time
-        
-        # Compute single output filename for no-merge single file case
-        single_output_filename = None
-        if merge_mode == MergeMode.NO_MERGE and len(files) == 1:
-            single_output_filename = files[0].with_suffix(format_choice.extension).name
-        
-        self.ui.show_conversion_summary(
-            total_files=len(files),
-            output_count=output_count,
-            merge_mode=merge_mode,
-            merged_filename=merged_output_filename,
-            total_runtime=elapsed,
-            total_input_size_formatted=File.format_file_size(total_input_size),
-            total_output_size_formatted=File.format_file_size(total_output_size),
-            single_output_filename=single_output_filename
-        )
-
-        # Ask user whether to run another conversion or quit
-        try:
-            run_again = self.ui.ask_again()
-        except Exception:
-            # If UI doesn't implement the method, default to quitting
-            return NextAction.QUIT
-
-        return NextAction.RESTART if run_again else NextAction.QUIT
-
-    
     def _get_files_to_process(self, input_path: PathLike) -> List[PathLike]:
         """
         Determine which files to process based on input path.
@@ -402,3 +282,109 @@ class ConverterController:
         actual_filename = output_name.with_suffix(format_choice.extension).name
         
         return actual_filename, output_size
+
+    def _get_converter(self, file_path: PathLike):
+        ext = file_path.suffix.lower()
+        converter_class = self.converters.get(ext)
+        return converter_class(file_path) if converter_class else None
+    
+    def _get_compatible_files(self, directory: PathLike) -> List[PathLike]:
+        supported_extensions = list(self.converters.keys())
+        return [
+            f for f in directory.iterdir() 
+            if f.suffix.lower() in supported_extensions
+        ]
+    
+    def _get_format_handler(self, format_choice: OutputFormat) -> OutputHandler:
+        handler_class = self.handlers.get(format_choice)
+        if handler_class is None:
+            raise ValueError(f"Unknown output format: {format_choice}")
+        return handler_class()
+
+    def _handle_source_input(self):
+        input_str = self.ui.get_path_input()
+        input_path = self.path_factory(input_str)
+
+        if not input_path.exists():
+            self.ui.show_error("fatal error: path not found")
+            return 
+
+        self.state_machine.context.input_path = input_path
+        self.state_machine.next()
+
+    def _handle_format_selection(self):
+        format_choice = self.ui.select_output_format()
+        self.state_machine.context.format_choice = format_choice
+        self.state_machine.next()
+
+    def _handle_merge_mode_selection(self):
+        merge_mode = self.ui.select_merge_mode()
+        self.state_machine.context.merge_mode = merge_mode
+        if merge_mode == MergeMode.MERGE:
+            self.state_machine.context.merged_filename = self.ui.prompt_merged_filename()
+        self.state_machine.next()
+
+    def _handle_files_selection(self):
+        input_path = self.state_machine.context.input_path
+        files = self._get_files_to_process(input_path)
+        
+        if not files:
+            self.ui.show_error("no compatible files found")
+            self.state_machine.reset() 
+            return
+
+        self.state_machine.context.files = files
+        self.ui.clear_and_show_header() 
+        self.state_machine.next()
+
+    def _handle_processing(self):
+        context = self.state_machine.context
+        handler = self._get_format_handler(context.format_choice)
+        context.handler = handler
+
+        total_input_size = sum(file.stat().st_size for file in context.files)
+        
+        start_time = time.perf_counter()
+        accumulator, output_count, total_output_size = self._process_files(
+            context.files, handler, context.merge_mode
+        )
+
+        merged_output_filename = None
+        if context.merge_mode == MergeMode.MERGE and accumulator:
+            merged_output_filename, merge_output_size = self._save_merged_output(
+                context.input_path, handler, accumulator, context.format_choice, context.merged_filename
+            )
+            total_output_size += merge_output_size
+            output_count = 1 
+
+        elapsed = time.perf_counter() - start_time
+        
+        single_output_filename = None
+        if context.merge_mode == MergeMode.NO_MERGE and len(context.files) == 1:
+            single_output_filename = context.files[0].with_suffix(context.format_choice.extension).name
+        
+        self.ui.show_conversion_summary(
+            total_files=len(context.files),
+            output_count=output_count,
+            merge_mode=context.merge_mode,
+            merged_filename=merged_output_filename,
+            total_runtime=elapsed,
+            total_input_size_formatted=File.format_file_size(total_input_size),
+            total_output_size_formatted=File.format_file_size(total_output_size),
+            single_output_filename=single_output_filename
+        )
+        self.state_machine.next()
+
+
+    def _handle_complete(self) -> bool:
+        try:
+            run_again = self.ui.ask_again()
+        except Exception:
+            return False
+
+        if run_again:
+            self.state_machine.reset()
+            return True
+        else:
+            self.state_machine.next() 
+            return False

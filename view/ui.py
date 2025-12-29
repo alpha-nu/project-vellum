@@ -134,7 +134,7 @@ class RetroCLI(UIInterface):
             "width": self.panel_width,
         }
         if title:
-            kwargs["title"] = f"[{self.colors[color]}]\\[{title}][/]"
+            kwargs["title"] = f"[{self.colors[color]}]\\[{title}][/ ]"
             kwargs["title_align"] = "left"
         if padding:
             kwargs["padding"] = padding
@@ -253,7 +253,7 @@ class RetroCLI(UIInterface):
                 width=self.panel_width,
             )
         )
-
+ 
     def select_files(self, file_data: list[dict]) -> list[int]:
         """Display file selector and return indices of selected files.
         
@@ -272,7 +272,7 @@ class RetroCLI(UIInterface):
             self.draw_header()
 
             table = self._create_selection_table()
-
+            
             for i, file_info in enumerate(file_data):
                 checkbox = "✔" if i in selected_indices else "❏"
                 marker = f"[{self.colors['secondary']}]►[/]" if i == current_index else " "
@@ -314,15 +314,10 @@ class RetroCLI(UIInterface):
 
         return selected_indices
 
-    def get_user_input(self):
-        """Get user input from user with selection dialogs."""
-        path_str = self._get_path_input()
-        format_choice = self._select_output_format()
-        merge_choice = self._select_merge_mode()
-        merged_filename = self._prompt_merged_filename() if merge_choice == MergeMode.MERGE else None
-        return path_str, format_choice, merge_choice, merged_filename
 
-    def _get_path_input(self) -> str:
+
+
+    def get_path_input(self) -> str:
         """Get path input from user."""
         self.console.clear()
         self.draw_header()
@@ -331,21 +326,21 @@ class RetroCLI(UIInterface):
         self.print_center(self._create_panel(prompt))
         return self.input_center()
 
-    def _select_output_format(self) -> OutputFormat:
+    def select_output_format(self) -> OutputFormat:
         """Interactive output format selection menu."""
         return self._radio_select(
             [OutputFormat.PLAIN_TEXT, OutputFormat.MARKDOWN, OutputFormat.JSON],
             title="select output format"
         )
 
-    def _select_merge_mode(self) -> MergeMode:
+    def select_merge_mode(self) -> MergeMode:
         """Interactive merge mode selection menu."""
         return self._radio_select(
             [MergeMode.NO_MERGE, MergeMode.MERGE, MergeMode.PER_PAGE],
             title="select merge mode"
         )
 
-    def _prompt_merged_filename(self) -> str:
+    def prompt_merged_filename(self) -> str:
         """Prompt user for the name of the merged output file."""
         self.console.clear()
         self.draw_header()
@@ -444,3 +439,6 @@ class RetroCLI(UIInterface):
             elif token.key == KeyboardKey.CHAR and token.char == "q":
                 return False
             # Else continue waiting
+
+    # Note: legacy private/test helpers removed — use public API methods:
+    # `input_center()`, `select_output_format()`, `select_merge_mode()`, `prompt_merged_filename()`

@@ -38,7 +38,19 @@ class UIInterface(ABC):
         pass
 
     @abstractmethod
-    def get_user_input(self):
+    def get_path_input(self) -> str:
+        pass
+
+    @abstractmethod
+    def select_output_format(self):
+        pass
+
+    @abstractmethod
+    def select_merge_mode(self):
+        pass
+
+    @abstractmethod
+    def prompt_merged_filename(self) -> str:
         pass
 
     @abstractmethod

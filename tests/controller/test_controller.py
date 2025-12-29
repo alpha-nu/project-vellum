@@ -102,9 +102,8 @@ class TestRunOnce:
         path_factory = MockPathBuilder().with_exists(False).build_factory()
         controller = ConverterController(ui, mock_converters, handlers, path_factory)
         
-        result = controller._run_once()
-        
-        assert result == NextAction.QUIT
+        # Run one step and assert error shown
+        controller.run(loop=False)
         ui.show_error.assert_called_once()
         assert "path not found" in ui.show_error.call_args[0][0]
     
@@ -125,9 +124,11 @@ class TestRunOnce:
         path_factory = lambda s: mock_path
         controller = ConverterController(ui, mock_converters, handlers, path_factory)
         
-        result = controller._run_once()
-        
-        assert result == NextAction.QUIT
+        # Drive controller through source -> format -> merge -> files selection
+        controller.run(loop=False)  # SOURCE_INPUT
+        controller.run(loop=False)  # FORMAT_SELECTION
+        controller.run(loop=False)  # MERGE_MODE_SELECTION
+        controller.run(loop=False)  # FILES_SELECTION -> should trigger error
         ui.show_error.assert_called_once()
         assert "no compatible files found" in ui.show_error.call_args[0][0]
     
@@ -137,11 +138,16 @@ class TestRunOnce:
         
         controller = ConverterController(ui, mock_converters, handlers, mock_pdf_path)
         
-        result = controller._run_once()
-        
-        assert result == NextAction.QUIT
-        ui.show_conversion_summary.assert_called_once()
+        # Drive the controller until processing summary is shown
+        while not ui.show_conversion_summary.called:
+            controller.run(loop=False)
+
+        # Advance once to COMPLETE and handle ask_again
+        result = controller.run(loop=False)
+
+        assert ui.show_conversion_summary.call_count == 1
         assert ui.show_conversion_summary.call_args.kwargs['total_files'] == 1
+        assert result is False
     
     def test_ask_again_true_returns_restart(self, mock_converters, mock_handler, mock_pdf_path):
         ui = MockUIBuilder("test.pdf").with_run_again(True).build()
@@ -149,9 +155,13 @@ class TestRunOnce:
         
         controller = ConverterController(ui, mock_converters, handlers, mock_pdf_path)
         
-        result = controller._run_once()
-        
-        assert result == NextAction.RESTART
+        # Drive until summary, then handle COMPLETE which should restart
+        while not ui.show_conversion_summary.called:
+            controller.run(loop=False)
+
+        result = controller.run(loop=False)
+
+        assert result is True
     
     def test_ask_again_exception_returns_quit(self, mock_converters, mock_handler, mock_pdf_path):
         """Test that exception in ask_again results in QUIT."""
@@ -165,9 +175,13 @@ class TestRunOnce:
         
         controller = ConverterController(ui, mock_converters, handlers, mock_pdf_path)
         
-        result = controller._run_once()
-        
-        assert result == NextAction.QUIT
+        # Drive until summary and then handle COMPLETE which should quit on exception
+        while not ui.show_conversion_summary.called:
+            controller.run(loop=False)
+
+        result = controller.run(loop=False)
+
+        assert result is False
 
 
 class TestGetFilesToProcess:
@@ -395,13 +409,18 @@ class TestIntegrationScenarios:
             ui, mock_converters, handlers, lambda s: mock_file
         )
         
-        result = controller._run_once()
-        
-        assert result == NextAction.QUIT
-        ui.show_conversion_summary.assert_called_once()
+        # Drive until summary shown
+        while not ui.show_conversion_summary.called:
+            controller.run(loop=False)
+
+        # Advance to COMPLETE and handle ask_again
+        result = controller.run(loop=False)
+
+        assert ui.show_conversion_summary.call_count == 1
         call_kwargs = ui.show_conversion_summary.call_args.kwargs
         assert call_kwargs['output_count'] == 1
         assert "merged" in call_kwargs['merged_filename']
+        assert result is False
     
 
     def test_per_page_mode_full_flow(self, mock_converters, mock_handler):
@@ -415,10 +434,15 @@ class TestIntegrationScenarios:
             ui, mock_converters, handlers, lambda s: mock_file
         )
         
-        result = controller._run_once()
-        
-        assert result == NextAction.QUIT
-        ui.show_conversion_summary.assert_called_once()
+        # Drive until summary shown
+        while not ui.show_conversion_summary.called:
+            controller.run(loop=False)
+
+        # Advance to COMPLETE and handle ask_again
+        result = controller.run(loop=False)
+
+        assert ui.show_conversion_summary.call_count == 1
         assert ui.show_conversion_summary.call_args.kwargs['output_count'] == 3  # MockConverter returns 3 pages
+        assert result is False
 
 
