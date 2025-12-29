@@ -5,6 +5,7 @@ from unittest.mock import MagicMock
 import pytest
 from view.merge_mode import MergeMode
 from view.output_format import OutputFormat
+from view.interface import ActionResult
 
 
 # ============================================================================
@@ -47,7 +48,8 @@ class MockUIBuilder:
                 self.show_error = MagicMock()
                 self.show_conversion_summary = MagicMock()
                 # ask_again returns True on first call (if configured), False thereafter
-                self.ask_again = MagicMock(side_effect=[builder.run_again, False] if builder.run_again else [False])
+                from view.interface import ActionResult
+                self.ask_again = MagicMock(side_effect=[ActionResult.value(builder.run_again), ActionResult.value(False)] if builder.run_again else [ActionResult.value(False)])
             
             def draw_header(self):
                 pass
@@ -56,22 +58,26 @@ class MockUIBuilder:
                 pass
             
             def get_path_input(self):
-                return builder.file_path
+                from view.interface import ActionResult
+                return ActionResult.value(builder.file_path)
 
             def get_user_input(self):
                 return builder.file_path, builder.format_choice, builder.merge_mode, builder.merged_filename
             
             def select_output_format(self):
-                return builder.format_choice
+                return ActionResult.value(builder.format_choice)
 
             def select_merge_mode(self):
-                return builder.merge_mode
+                from view.interface import ActionResult
+                return ActionResult.value(builder.merge_mode)
 
             def prompt_merged_filename(self):
-                return builder.merged_filename
+                from view.interface import ActionResult
+                return ActionResult.value(builder.merged_filename)
             
             def select_files(self, file_data):
-                return list(range(len(file_data)))
+                from view.interface import ActionResult
+                return ActionResult.value(list(range(len(file_data))))
             
             def get_progress_bar(self):
                 @contextmanager

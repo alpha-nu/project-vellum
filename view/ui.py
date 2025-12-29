@@ -15,7 +15,7 @@ from rich.align import Align
 from typing import Optional
 from view.output_format import OutputFormat
 from view.merge_mode import MergeMode
-from view.interface import UIInterface
+from view.interface import UIInterface, ActionResult
 from view.keyboard import KeyboardKey
 
 
@@ -181,7 +181,7 @@ class RetroCLI(UIInterface):
             Selected option from the list
         """
         current_index = 0
-        hints = f"[{self.colors['secondary']}]⬆︎ /⬇︎[/] :navigate  [{self.colors['secondary']}][ENTER][/]:confirm"
+        hints = f"[{self.colors['secondary']}]⬆︎ /⬇︎[/] :navigate  [{self.colors['secondary']}][ENTER][/]:confirm  [{self.colors['secondary']}][BACKSPACE][/]:back"
         
         while True:
             self.console.clear()
@@ -199,6 +199,9 @@ class RetroCLI(UIInterface):
             self.print_center(self._create_hint_panel(hints))
 
             token = self.keyboard_reader()
+
+            if token.key == KeyboardKey.BACKSPACE:
+                return None
 
             if token.key == KeyboardKey.UP:
                 current_index = (current_index - 1) % len(options)
@@ -254,7 +257,7 @@ class RetroCLI(UIInterface):
             )
         )
  
-    def select_files(self, file_data: list[dict]) -> list[int]:
+    def select_files(self, file_data: list[dict]) -> ActionResult[list[int]]:
         """Display file selector and return indices of selected files.
         
         Args:
@@ -309,45 +312,53 @@ class RetroCLI(UIInterface):
                 else:
                     selected_indices = list(range(len(file_data)))
             elif token.key == KeyboardKey.CHAR and token.char == "q":
-                import sys
-                sys.exit(0)
+                return ActionResult.quit()
 
         self.console.clear()
         self.draw_header()
 
-        return selected_indices
+        return ActionResult.value(selected_indices)
 
-    def get_path_input(self) -> str:
+    def get_path_input(self) -> ActionResult[str]:
         """Get path input from user."""
         self.console.clear()
         self.draw_header()
 
         prompt = f"[{self.colors['primary']}]provide a file or directory path[/] [{self.colors['secondary']}](e.g. source.pdf or /data)[/]"
         self.print_center(self._create_panel(prompt))
-        return self.input_center()
+        result = self.input_center()
+        return ActionResult.value(result)
 
-    def select_output_format(self) -> OutputFormat:
+    def select_output_format(self) -> ActionResult[OutputFormat]:
         """Interactive output format selection menu."""
-        return self._radio_select(
+        result = self._radio_select(
             [OutputFormat.PLAIN_TEXT, OutputFormat.MARKDOWN, OutputFormat.JSON],
             title="select output format"
         )
+        # If radio returned None, treat as BACK; otherwise wrap the selected value.
+        if result is None:
+            return ActionResult.back()
+        return ActionResult.value(result)
 
-    def select_merge_mode(self) -> MergeMode:
+    def select_merge_mode(self) -> ActionResult[MergeMode]:
         """Interactive merge mode selection menu."""
-        return self._radio_select(
+        result = self._radio_select(
             [MergeMode.NO_MERGE, MergeMode.MERGE, MergeMode.PER_PAGE],
             title="select merge mode"
         )
+        if result is None:
+            return ActionResult.back()
+        return ActionResult.value(result)
 
-    def prompt_merged_filename(self) -> str:
+    def prompt_merged_filename(self) -> ActionResult[str]:
         """Prompt user for the name of the merged output file."""
         self.console.clear()
         self.draw_header()
 
         prompt = f"[{self.colors['primary']}]enter name for merged output file[/] [{self.colors['secondary']}](without extension)[/]"
         self.print_center(self._create_panel(prompt))
-        return self.input_center().strip()
+        result = self.input_center().strip()
+        return ActionResult.value(result)
 
     def get_progress_bar(self):
         @contextmanager
@@ -429,14 +440,14 @@ class RetroCLI(UIInterface):
         ))
 
 
-    def ask_again(self):
+    def ask_again(self) -> ActionResult[bool]:
         hints = f"[{self.colors['secondary']}][ENTER][/]:run another conversion  [{self.colors['secondary']}][Q][/]:quit"
         self.print_center(self._create_hint_panel(hints))
         while True:
             token = self.keyboard_reader()
             if token.key == KeyboardKey.ENTER:
-                return True
+                return ActionResult.value(True)
             elif token.key == KeyboardKey.CHAR and token.char == "q":
-                return False
+                return ActionResult.quit()
             # Else continue waiting
 

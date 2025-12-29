@@ -18,6 +18,7 @@ from domain.core.base_converter import BaseConverter
 from domain.model.file import File
 from enum import Enum
 from controller.workflow.state_machine import WorkflowState, WorkflowStateMachine, WorkflowContext
+from view.interface import ActionResult, ActionKind
 
 
 ConverterMap = Dict[str, Type[BaseConverter]]
@@ -25,10 +26,6 @@ HandlerMap = Dict[OutputFormat, Type[OutputHandler]]
 PathFactory = Callable[[str], PathLike] 
 
 MERGE_SOURCE_DELIMITER = "\n--- start source: {source} ---\n"
-
-class NextAction(Enum):
-    QUIT = 0
-    RESTART = 1
 
 class ConverterController:
     """Controller that orchestrates document conversion workflow."""
@@ -71,9 +68,25 @@ class ConverterController:
 
             current_state = self.state_machine.get_state()
             result = handlers.get(current_state)()
-            if result is None:
+
+
+            if result.kind == ActionKind.BACK:
+                if self.state_machine.can_go_back():
+                    self.state_machine.back()
                 return True
-            return result
+            if result.kind == ActionKind.QUIT:
+                return False
+            if result.kind == ActionKind.ERROR:
+                # Set error in context and transition to ERROR state
+                self.state_machine.context.error_message = result.message
+                self.state_machine.context.error_origin = current_state
+                self.state_machine.state = WorkflowState.ERROR
+                return True
+
+            # VALUE: handler returned a VALUE ActionResult. If the payload is a bool,
+            # treat it as the loop continuation flag; otherwise default to continue.
+            payload = result.payload
+            return payload if isinstance(payload, bool) else True
 
         if not loop:
             return run_once()
@@ -97,7 +110,10 @@ class ConverterController:
         if input_path.is_dir():
             compatible_files = self._get_compatible_files(input_path)
             file_data = [File.from_path(path).to_dict() for path in compatible_files]
-            selected_indices = self.ui.select_files(file_data)
+            result = self.ui.select_files(file_data)
+            if result.kind != ActionKind.VALUE:
+                return []
+            selected_indices = result.payload
             return [compatible_files[i] for i in selected_indices]
         else:
             return [input_path]
@@ -299,7 +315,11 @@ class ConverterController:
         return handler_class()
 
     def _handle_source_input(self):
-        input_str = self.ui.get_path_input()
+        result = self.ui.get_path_input()
+        if result.kind != ActionKind.VALUE:
+            return result
+        input_str = result.payload
+
         input_path = self.path_factory(input_str)
 
         if not input_path.exists():
@@ -307,36 +327,64 @@ class ConverterController:
             ctx.error_message = "path not found"
             ctx.error_origin = WorkflowState.SOURCE_INPUT
             self.state_machine.state = WorkflowState.ERROR
-            return 
+            return ActionResult.value(True)
 
         self.state_machine.context.input_path = input_path
         self.state_machine.next()
+        return ActionResult.value(True)
 
     def _handle_format_selection(self):
-        format_choice = self.ui.select_output_format()
+        result = self.ui.select_output_format()
+        if result.kind != ActionKind.VALUE:
+            return result
+        format_choice = result.payload
+
         self.state_machine.context.format_choice = format_choice
         self.state_machine.next()
+        return ActionResult.value(True)
 
     def _handle_merge_mode_selection(self):
-        merge_mode = self.ui.select_merge_mode()
+        result = self.ui.select_merge_mode()
+        if result.kind != ActionKind.VALUE:
+            return result
+        merge_mode = result.payload
+
         self.state_machine.context.merge_mode = merge_mode
         if merge_mode == MergeMode.MERGE:
-            self.state_machine.context.merged_filename = self.ui.prompt_merged_filename()
+            merged_result = self.ui.prompt_merged_filename()
+            if merged_result.kind != ActionKind.VALUE:
+                return merged_result
+            merged_filename = merged_result.payload
+            self.state_machine.context.merged_filename = merged_filename
+
         self.state_machine.next()
+        return ActionResult.value(True)
 
     def _handle_files_selection(self):
         input_path = self.state_machine.context.input_path
-        files = self._get_files_to_process(input_path)
-        
+
+        # If input is a directory, prompt user to select files (may return ActionResult)
+        if input_path.is_dir():
+            compatible_files = self._get_compatible_files(input_path)
+            file_data = [File.from_path(path).to_dict() for path in compatible_files]
+            result = self.ui.select_files(file_data)
+            if result.kind != ActionKind.VALUE:
+                return result
+            selected_indices = result.payload
+            files = [compatible_files[i] for i in selected_indices]
+        else:
+            files = [input_path]
+
         if not files:
             ctx = self.state_machine.context
             ctx.error_message = "no compatible files found"
             ctx.error_origin = WorkflowState.FILES_SELECTION
             self.state_machine.state = WorkflowState.ERROR
-            return
+            return ActionResult.value(True)
 
         self.state_machine.context.files = files
         self.state_machine.next()
+        return ActionResult.value(True)
 
     def _handle_processing(self):
         context = self.state_machine.context
@@ -375,20 +423,24 @@ class ConverterController:
             single_output_filename=single_output_filename
         )
         self.state_machine.next()
+        return ActionResult.value(True)
 
 
     def _handle_complete(self) -> bool:
         try:
-            run_again = self.ui.ask_again()
+            result = self.ui.ask_again()
+            if result.kind != ActionKind.VALUE:
+                return result
+            run_again = result.payload
         except Exception:
-            return False
+            return ActionResult.value(False)
 
         if run_again:
             self.state_machine.reset()
-            return True
+            return ActionResult.value(True)
         else:
-            self.state_machine.next() 
-            return False
+            self.state_machine.next()
+            return ActionResult.value(False)
 
     def _handle_error(self) -> bool:
         """Handle transient errors: show message and use `ask_again()` for retry/quit.
@@ -398,7 +450,10 @@ class ConverterController:
         """
         msg = self.state_machine.context.error_message
         self.ui.show_error(msg)
-        run_again = self.ui.ask_again()
+        result = self.ui.ask_again()
+        if result.kind != ActionKind.VALUE:
+            return result
+        run_again = result.payload
 
         if run_again:
             # On retry, return to the originating state if available.
@@ -409,9 +464,9 @@ class ConverterController:
 
             if origin is not None:
                 self.state_machine.state = origin
-                return True
+                return ActionResult.value(True)
             # Fallback: reset workflow
             self.state_machine.reset()
-            return True
+            return ActionResult.value(True)
         else:
-            return False
+            return ActionResult.value(False)

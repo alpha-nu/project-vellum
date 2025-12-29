@@ -9,6 +9,7 @@ class KeyboardKey(Enum):
     DOWN = auto()
     ENTER = auto()
     SPACE = auto()
+    BACKSPACE = auto()
     CHAR = auto()
     UNKNOWN = auto()
 
@@ -41,5 +42,7 @@ def read_char() -> KeyboardToken:
         return KeyboardToken(KeyboardKey.ENTER)
     if ch == " ":
         return KeyboardToken(KeyboardKey.SPACE)
+    if ch in ("\x7f", "\b"):
+        return KeyboardToken(KeyboardKey.BACKSPACE)
     # Regular character
     return KeyboardToken(KeyboardKey.CHAR, ch.lower())

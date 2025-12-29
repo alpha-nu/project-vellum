@@ -3,11 +3,13 @@
 import pytest
 from pytest import raises
 from unittest.mock import patch, MagicMock
-from controller.converter_controller import ConverterController, NextAction
+from controller.converter_controller import ConverterController
 from tests.controller.conftest import MockUIBuilder, MockPathBuilder
 from view.merge_mode import MergeMode
 from view.output_format import OutputFormat
 from controller.workflow.state_machine import WorkflowState
+from unittest.mock import MagicMock
+from view.interface import ActionResult
 
 
 class TestGetConverter:
@@ -233,6 +235,60 @@ class TestRunOnce:
 
         assert result is True
         assert controller.state_machine.get_state() == WorkflowState.SOURCE_INPUT
+
+
+class TestRunOnceExtra:
+    """Additional run_once behavior tests migrated from separate file.
+    These use only Mock objects for UI interactions.
+    """
+
+    def test_run_once_quit_from_ui_stops_loop(self):
+        ui = MagicMock()
+        ui.get_path_input.return_value = ActionResult.quit()
+
+        controller = ConverterController(ui, {}, {}, lambda s: None)
+
+        res = controller.run(loop=False)
+        assert res is False
+
+
+    def test_run_once_back_moves_state_back(self):
+        ui = MagicMock()
+        controller = ConverterController(ui, {}, {}, lambda s: None)
+        controller.state_machine.next()  # SOURCE_INPUT -> FORMAT_SELECTION
+
+        ui.select_output_format.return_value = ActionResult.back()
+
+        res = controller.run(loop=False)
+        assert res is True
+        assert controller.state_machine.get_state().name == 'SOURCE_INPUT'
+
+
+    def test_run_once_error_sets_error_state(self):
+        ui = MagicMock()
+        ui.get_path_input.return_value = ActionResult.error("boom")
+
+        controller = ConverterController(ui, {}, {}, lambda s: MockPathBuilder().with_exists(False).build())
+
+        controller.run(loop=False)
+        assert controller.state_machine.get_state().name == 'ERROR'
+        assert controller.state_machine.context.error_message == 'boom'
+
+
+    def test_get_files_to_process_quit_returns_empty_list(self):
+        ui = MagicMock()
+        mock_dir = (
+            MockPathBuilder('/dir')
+            .with_exists(True)
+            .with_is_dir(True)
+            .with_files([])
+            .build()
+        )
+        ui.select_files.return_value = ActionResult.quit()
+
+        controller = ConverterController(ui, {'.pdf': lambda p: None}, {}, lambda s: mock_dir)
+        files = controller._get_files_to_process(mock_dir)
+        assert files == []
 
 
 class TestGetFilesToProcess:
@@ -495,5 +551,91 @@ class TestIntegrationScenarios:
         assert ui.show_conversion_summary.call_count == 1
         assert ui.show_conversion_summary.call_args.kwargs['output_count'] == 3  # MockConverter returns 3 pages
         assert result is False
+
+
+
+class TestActionResultHandling:
+    def test_back_from_format_selection_returns_to_previous_state(self, mock_converters, mock_handler):
+        ui = MockUIBuilder().build()
+        # select_output_format will return a BACK action
+        from unittest.mock import MagicMock
+        ui.select_output_format = MagicMock(return_value=ActionResult.back())
+
+        controller = ConverterController(ui, mock_converters, {OutputFormat.PLAIN_TEXT: lambda: mock_handler}, lambda s: None)
+
+        # Move state machine to FORMAT_SELECTION (push SOURCE_INPUT on stack)
+        controller.state_machine.next()
+
+        # Run one step (FORMAT_SELECTION) and expect it to handle BACK and return True
+        result = controller.run(loop=False)
+
+        assert result is True
+        assert controller.state_machine.get_state() == WorkflowState.SOURCE_INPUT
+
+
+    def test_quit_from_files_selection_stops_run(self, mock_converters, mock_handler):
+        # Setup UI to return QUIT from select_files
+        ui = MockUIBuilder().build()
+        ui.select_files = MagicMock(return_value=ActionResult.quit())
+
+        controller = ConverterController(ui, mock_converters, {OutputFormat.PLAIN_TEXT: lambda: mock_handler}, lambda s: None)
+
+        # Advance state machine to FILES_SELECTION
+        controller.state_machine.next()
+        controller.state_machine.next()
+        controller.state_machine.next()
+
+        # Ensure there is an input_path in context for the handler to inspect
+        controller.state_machine.context.input_path = MockPathBuilder().with_is_dir(True).build()
+
+        result = controller.run(loop=False)
+
+        assert result is False
+
+
+    def test_error_from_get_path_input_sets_error_state(self, mock_converters, mock_handler):
+        # Make get_path_input return an ERROR action
+        ui = MockUIBuilder().build()
+        ui.get_path_input = MagicMock(return_value=ActionResult.error("bad path"))
+
+        controller = ConverterController(ui, mock_converters, {OutputFormat.PLAIN_TEXT: lambda: mock_handler}, lambda s: None)
+
+        result = controller.run(loop=False)
+
+        assert result is True
+        assert controller.state_machine.get_state() == WorkflowState.ERROR
+        assert controller.state_machine.context.error_message == "bad path"
+
+
+class TestSaveMergedOutputExtra:
+    def test_save_merged_output_with_directory_and_file(self, tmp_path):
+        ui = MagicMock()
+        handlers = {OutputFormat.PLAIN_TEXT: lambda: MagicMock(save=MagicMock(return_value=123))}
+        dir_path = MockPathBuilder('/mock/dir').with_is_dir(True).build()
+
+        controller = ConverterController(ui, {}, handlers, lambda s: dir_path)
+
+        handler = handlers[OutputFormat.PLAIN_TEXT]()
+        accumulator = ["a", "b"]
+        filename, size = controller._save_merged_output(dir_path, handler, accumulator, OutputFormat.PLAIN_TEXT, "merged")
+
+        assert filename.endswith(OutputFormat.PLAIN_TEXT.extension)
+        assert size == 123
+
+
+    def test_save_merged_output_with_file_parent(self, tmp_path):
+        ui = MagicMock()
+        handlers = {OutputFormat.MARKDOWN: lambda: MagicMock(save=MagicMock(return_value=55))}
+
+        file_path = MockPathBuilder('/mock/file').with_is_dir(False).build()
+
+        controller = ConverterController(ui, {}, handlers, lambda s: file_path)
+
+        handler = handlers[OutputFormat.MARKDOWN]()
+        accumulator = ["x"]
+        filename, size = controller._save_merged_output(file_path, handler, accumulator, OutputFormat.MARKDOWN, "outname")
+
+        assert filename.endswith(OutputFormat.MARKDOWN.extension)
+        assert size == 55
 
 

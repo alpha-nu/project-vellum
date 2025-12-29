@@ -1,6 +1,5 @@
 from view.keyboard import read_char, KeyboardKey
 
-
 def test_read_char_arrow_up(monkeypatch):
     seq = iter(["\x1b", "[", "A"])
     monkeypatch.setattr("view.keyboard.readchar.readchar", lambda: next(seq))
@@ -57,3 +56,17 @@ def test_read_char_unknown_escapes(monkeypatch):
     monkeypatch.setattr("view.keyboard.readchar.readchar", lambda: next(seq))
     token = read_char()
     assert token.key == KeyboardKey.UNKNOWN
+
+
+def test_read_char_backspace_variants(monkeypatch):
+    # DEL (0x7f)
+    seq = iter(["\x7f"])
+    monkeypatch.setattr("view.keyboard.readchar.readchar", lambda: next(seq))
+    token = read_char()
+    assert token.key == KeyboardKey.BACKSPACE
+
+    # BACKSPACe
+    seq = iter(["\b"])
+    monkeypatch.setattr("view.keyboard.readchar.readchar", lambda: next(seq))
+    token = read_char()
+    assert token.key == KeyboardKey.BACKSPACE

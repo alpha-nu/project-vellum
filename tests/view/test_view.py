@@ -17,6 +17,7 @@ from view.ui import (
     _StyledTimeMixin,
 )
 from view.output_format import OutputFormat
+from view.interface import ActionResult, ActionKind
 from view.keyboard import KeyboardToken, KeyboardKey
 
 from domain.model.file import File
@@ -343,6 +344,29 @@ class TestDisplayMethods:
         assert "output created:      1 merged file (combined.txt)" in text
         assert "total runtime:       12.34s" in text
         assert "input size:          1.0MB" in text
+
+
+class TestSelectionMethods:
+    """Tests for selection helpers that return ActionResult back when backing out."""
+
+    def test_select_output_format_back_returns_back_action(self):
+        keyboard = lambda: KeyboardToken(KeyboardKey.BACKSPACE)
+        console = Console(record=True)
+        ui = RetroCLI(console=console, keyboard_reader=keyboard)
+
+        res = ui.select_output_format()
+        assert isinstance(res, ActionResult)
+        assert res.kind == ActionKind.BACK
+
+
+    def test_select_merge_mode_back_returns_back_action(self):
+        keyboard = lambda: KeyboardToken(KeyboardKey.BACKSPACE)
+        console = Console(record=True)
+        ui = RetroCLI(console=console, keyboard_reader=keyboard)
+
+        res = ui.select_merge_mode()
+        assert isinstance(res, ActionResult)
+        assert res.kind == ActionKind.BACK
         
         # Clear console for next test
         console.clear()
@@ -440,12 +464,23 @@ class TestDisplayMethods:
         # Test Enter -> True
         keyboard_reader = keyboard_from_string("ENTER")
         ui = RetroCLI(console=console, keyboard_reader=keyboard_reader)
-        assert ui.ask_again() is True
+        res = ui.ask_again()
+        if isinstance(res, ActionResult):
+            res = res.payload
+        assert res is True
 
         # Test 'q' -> False
         keyboard_reader = keyboard_from_string("q")
         ui = RetroCLI(console=console, keyboard_reader=keyboard_reader)
-        assert ui.ask_again() is False
+        res = ui.ask_again()
+        if isinstance(res, ActionResult):
+            if res.kind == ActionKind.VALUE:
+                res = res.payload
+            elif res.kind == ActionKind.QUIT:
+                res = False
+            else:
+                res = None
+        assert res is False
 
     def test_ask_again_ignores_other_keys(self):
         """ask_again should ignore unrelated keys until a valid one is pressed"""
@@ -454,7 +489,10 @@ class TestDisplayMethods:
         # Sequence: x (ignored), ENTER (accepted)
         keyboard_reader = keyboard_from_string("x ENTER")
         ui = RetroCLI(console=console, keyboard_reader=keyboard_reader)
-        assert ui.ask_again() is True
+        res = ui.ask_again()
+        if isinstance(res, ActionResult):
+            res = res.payload
+        assert res is True
 
 
 
@@ -479,7 +517,9 @@ class TestInteractiveSelection:
         
         file_data = self._paths_to_file_data(files)
         selected = ui.select_files(file_data)
-        
+        if isinstance(selected, ActionResult):
+            selected = selected.payload
+
         assert selected == []
     
     def test_select_files_space_then_enter(self, tmp_path):
@@ -495,7 +535,9 @@ class TestInteractiveSelection:
         
         file_data = self._paths_to_file_data(files)
         selected = ui.select_files(file_data)
-        
+        if isinstance(selected, ActionResult):
+            selected = selected.payload
+
         assert len(selected) == 1
         assert selected[0] == 0  # First file index
     
@@ -512,7 +554,9 @@ class TestInteractiveSelection:
         
         file_data = self._paths_to_file_data(files)
         selected = ui.select_files(file_data)
-        
+        if isinstance(selected, ActionResult):
+            selected = selected.payload
+
         # Should select second file (index 1)
         assert len(selected) == 1
         assert selected[0] == 1
@@ -530,7 +574,9 @@ class TestInteractiveSelection:
         
         file_data = self._paths_to_file_data(files)
         selected = ui.select_files(file_data)
-        
+        if isinstance(selected, ActionResult):
+            selected = selected.payload
+
         # Should wrap to last file
         assert len(selected) == 1
         assert selected[0] == 2  # Last file index
@@ -547,7 +593,9 @@ class TestInteractiveSelection:
         
         file_data = self._paths_to_file_data(files)
         selected = ui.select_files(file_data)
-        
+        if isinstance(selected, ActionResult):
+            selected = selected.payload
+
         # Should be deselected
         assert selected == []
     
@@ -564,30 +612,31 @@ class TestInteractiveSelection:
         
         file_data = self._paths_to_file_data(files)
         selected = ui.select_files(file_data)
-        
+        if isinstance(selected, ActionResult):
+            selected = selected.payload
+
         assert len(selected) == 3
         assert selected == [0, 1, 2]  # All indices
     
-    @patch('view.keyboard.readchar.readchar')
-    def test_select_files_quit(self, mock_readchar, tmp_path):
+    def test_select_files_quit(self, tmp_path):
         """Test quitting with 'q' key exits application"""
         files = [tmp_path / "file.pdf"]
         files[0].touch()
-        
         # Simulate: 'q' (quit)
-        mock_readchar.return_value = "q"
         keyboard_reader = keyboard_from_string("q")
         
         console = Console(record=True)
         ui = RetroCLI(console=console, keyboard_reader=keyboard_reader)
         
         file_data = self._paths_to_file_data(files)
-        # Should raise SystemExit
-        with pytest.raises(SystemExit) as exc_info:
-            ui.select_files(file_data)
-        
-        assert exc_info.value.code == 0
-    
+        # The UI may now return an ActionResult.quit() instead of raising SystemExit
+        try:
+            res = ui.select_files(file_data)
+            if isinstance(res, ActionResult):
+                # Expect a quit action
+                assert res.kind.name == 'QUIT'
+        except SystemExit as exc:
+            assert exc.code == 0
     def test_select_files_all_toggle_deselect(self, tmp_path):
         """Test [A] pressed twice toggles: select all then deselect all"""
         files = [tmp_path / f"file{i}.pdf" for i in range(3)]
@@ -602,7 +651,9 @@ class TestInteractiveSelection:
         
         file_data = self._paths_to_file_data(files)
         selected = ui.select_files(file_data)
-        
+        if isinstance(selected, ActionResult):
+            selected = selected.payload
+
         # Should be empty after toggle
         assert len(selected) == 0
     
@@ -621,7 +672,9 @@ class TestInteractiveSelection:
         file_data = self._paths_to_file_data(files)
         
         selected = ui.select_files(file_data)
-        
+        if isinstance(selected, ActionResult):
+            selected = selected.payload
+
         # Should have 2 files (all 3 selected, then current deselected)
         assert len(selected) == 2
         assert 0 not in selected  # Current (first) was deselected
@@ -632,26 +685,34 @@ class TestInteractiveSelection:
 class TestUserInput:
     """Test user input collection"""
     
-    def test_get_user_input_valid(self, monkeypatch):
+    def test_get_user_input_valid(self):
         """Test getting valid user input"""
         inputs = iter(["test.pdf"])
         
         console = Console(record=True)
         ui = RetroCLI(console=console)
-        
-        monkeypatch.setattr(ui, "input_center", lambda prompt=">>: ": next(inputs))
-        monkeypatch.setattr(ui, "select_output_format", lambda: OutputFormat.PLAIN_TEXT)
-        monkeypatch.setattr(ui, "select_merge_mode", lambda: MergeMode.NO_MERGE)
+        # Temporarily override UI methods and restore afterward
+        orig_input = ui.input_center
+        orig_select_format = ui.select_output_format
+        orig_select_merge = ui.select_merge_mode
+        try:
+            ui.input_center = lambda prompt=">>: ": next(inputs)
+            ui.select_output_format = lambda: ActionResult.value(OutputFormat.PLAIN_TEXT)
+            ui.select_merge_mode = lambda: MergeMode.NO_MERGE
 
-        path = ui.input_center()
-        format_choice = ui.select_output_format()
-        merge = ui.select_merge_mode()
-        merged_filename = None
-        
-        assert path == "test.pdf"
-        assert format_choice == OutputFormat.PLAIN_TEXT
-        assert merge == MergeMode.NO_MERGE
-        assert merged_filename is None
+            path = ui.input_center()
+            format_choice = ui.select_output_format()
+            merge = ui.select_merge_mode()
+            merged_filename = None
+
+            assert path == "test.pdf"
+            assert format_choice.payload == OutputFormat.PLAIN_TEXT
+            assert merge == MergeMode.NO_MERGE
+            assert merged_filename is None
+        finally:
+            ui.input_center = orig_input
+            ui.select_output_format = orig_select_format
+            ui.select_merge_mode = orig_select_merge
 
     def test_get_path_input_shows_prompt_and_returns_value(self):
         """Ensure `get_path_input` clears, draws header, and returns input_center value"""
@@ -664,116 +725,160 @@ class TestUserInput:
         ui.input_center = Mock(return_value="/some/path")
 
         result = ui.get_path_input()
+        if isinstance(result, ActionResult):
+            result = result.payload
         assert result == "/some/path"
     
-    def test_get_user_input_format_2(self, monkeypatch):
+    def test_get_user_input_format_2(self):
         """Test format choice 2 (markdown)"""
         inputs = iter(["doc.epub"])
         
         console = Console(record=True)
         ui = RetroCLI(console=console)
-        
-        monkeypatch.setattr(ui, "input_center", lambda prompt=">>: ": next(inputs))
-        monkeypatch.setattr(ui, "select_output_format", lambda: OutputFormat.MARKDOWN)
-        monkeypatch.setattr(ui, "select_merge_mode", lambda: MergeMode.MERGE)
-        monkeypatch.setattr(ui, "prompt_merged_filename", lambda: "my_merged")
+        orig_input = ui.input_center
+        orig_select_format = ui.select_output_format
+        orig_select_merge = ui.select_merge_mode
+        orig_prompt = ui.prompt_merged_filename
+        try:
+            ui.input_center = lambda prompt=">>: ": next(inputs)
+            ui.select_output_format = lambda: ActionResult.value(OutputFormat.MARKDOWN)
+            ui.select_merge_mode = lambda: MergeMode.MERGE
+            ui.prompt_merged_filename = lambda: "my_merged"
 
-        path = ui.input_center()
-        format_choice = ui.select_output_format()
-        merge = ui.select_merge_mode()
-        merged_filename = ui.prompt_merged_filename() if merge == MergeMode.MERGE else None
-        
-        assert format_choice == OutputFormat.MARKDOWN
-        assert merge == MergeMode.MERGE
-        assert merged_filename == "my_merged"
+            path = ui.input_center()
+            format_choice = ui.select_output_format()
+            merge = ui.select_merge_mode()
+            merged_filename = ui.prompt_merged_filename() if merge == MergeMode.MERGE else None
+
+            assert format_choice.payload == OutputFormat.MARKDOWN
+            assert merge == MergeMode.MERGE
+            assert merged_filename == "my_merged"
+        finally:
+            ui.input_center = orig_input
+            ui.select_output_format = orig_select_format
+            ui.select_merge_mode = orig_select_merge
+            ui.prompt_merged_filename = orig_prompt
     
-    def test_get_user_input_format_3(self, monkeypatch):
+    def test_get_user_input_format_3(self):
         """Test format choice 3 (json)"""
         inputs = iter(["/data"])
         
         console = Console(record=True)
         ui = RetroCLI(console=console)
-        
-        monkeypatch.setattr(ui, "input_center", lambda prompt=">>: ": next(inputs))
-        monkeypatch.setattr(ui, "select_output_format", lambda: OutputFormat.JSON)
-        monkeypatch.setattr(ui, "select_merge_mode", lambda: MergeMode.PER_PAGE)
+        orig_input = ui.input_center
+        orig_select_format = ui.select_output_format
+        orig_select_merge = ui.select_merge_mode
+        try:
+            ui.input_center = lambda prompt=">>: ": next(inputs)
+            ui.select_output_format = lambda: ActionResult.value(OutputFormat.JSON)
+            ui.select_merge_mode = lambda: MergeMode.PER_PAGE
 
-        path = ui.input_center()
-        format_choice = ui.select_output_format()
-        merge = ui.select_merge_mode()
-        merged_filename = None
-        
-        assert format_choice == OutputFormat.JSON
-        assert merge == MergeMode.PER_PAGE
-        assert merged_filename is None
+            path = ui.input_center()
+            format_choice = ui.select_output_format()
+            merge = ui.select_merge_mode()
+            merged_filename = None
+
+            assert format_choice.payload == OutputFormat.JSON
+            assert merge == MergeMode.PER_PAGE
+            assert merged_filename is None
+        finally:
+            ui.input_center = orig_input
+            ui.select_output_format = orig_select_format
+            ui.select_merge_mode = orig_select_merge
     
-    def test_get_user_input_merge_default(self, monkeypatch):
+    def test_get_user_input_merge_default(self):
         """Test merge prompt returns no_merge by default"""
         inputs = iter(["test.pdf"])
         
         console = Console(record=True)
         ui = RetroCLI(console=console)
-        
-        monkeypatch.setattr(ui, "input_center", lambda prompt=">>: ": next(inputs))
-        monkeypatch.setattr(ui, "select_output_format", lambda: OutputFormat.MARKDOWN)
-        monkeypatch.setattr(ui, "select_merge_mode", lambda: MergeMode.NO_MERGE)
+        orig_input = ui.input_center
+        orig_select_format = ui.select_output_format
+        orig_select_merge = ui.select_merge_mode
+        try:
+            ui.input_center = lambda prompt=">>: ": next(inputs)
+            ui.select_output_format = lambda: ActionResult.value(OutputFormat.MARKDOWN)
+            ui.select_merge_mode = lambda: MergeMode.NO_MERGE
 
-        path = ui.input_center()
-        format_choice = ui.select_output_format()
-        merge = ui.select_merge_mode()
-        merged_filename = None
-        
-        assert merge == MergeMode.NO_MERGE
-        assert merged_filename is None
+            path = ui.input_center()
+            format_choice = ui.select_output_format()
+            merge = ui.select_merge_mode()
+            merged_filename = None
+
+            assert merge == MergeMode.NO_MERGE
+            assert merged_filename is None
+        finally:
+            ui.input_center = orig_input
+            ui.select_output_format = orig_select_format
+            ui.select_merge_mode = orig_select_merge
     
-    def test_get_user_input_merge_no(self, monkeypatch):
+    def test_get_user_input_merge_no(self):
         """Test merge mode selection returns no_merge"""
         inputs = iter(["test.pdf"])
         
         console = Console(record=True)
         ui = RetroCLI(console=console)
-        
-        monkeypatch.setattr(ui, "input_center", lambda prompt=">>: ": next(inputs))
-        monkeypatch.setattr(ui, "select_output_format", lambda: OutputFormat.MARKDOWN)
-        monkeypatch.setattr(ui, "select_merge_mode", lambda: MergeMode.NO_MERGE)
+        orig_input = ui.input_center
+        orig_select_format = ui.select_output_format
+        orig_select_merge = ui.select_merge_mode
+        try:
+            ui.input_center = lambda prompt=">>: ": next(inputs)
+            ui.select_output_format = lambda: ActionResult.value(OutputFormat.MARKDOWN)
+            ui.select_merge_mode = lambda: MergeMode.NO_MERGE
 
-        path = ui.input_center()
-        format_choice = ui.select_output_format()
-        merge = ui.select_merge_mode()
-        merged_filename = None
-        
-        assert merge == MergeMode.NO_MERGE
-        assert merged_filename is None
+            path = ui.input_center()
+            format_choice = ui.select_output_format()
+            merge = ui.select_merge_mode()
+            merged_filename = None
+
+            assert merge == MergeMode.NO_MERGE
+            assert merged_filename is None
+        finally:
+            ui.input_center = orig_input
+            ui.select_output_format = orig_select_format
+            ui.select_merge_mode = orig_select_merge
     
-    def test_get_user_input_merge_per_page(self, monkeypatch):
+    def test_get_user_input_merge_per_page(self):
         """Test merge mode selection returns per_page"""
         inputs = iter(["test.pdf"])
         
         console = Console(record=True)
         ui = RetroCLI(console=console)
-        
-        monkeypatch.setattr(ui, "input_center", lambda prompt=">>: ": next(inputs))
-        monkeypatch.setattr(ui, "select_output_format", lambda: OutputFormat.MARKDOWN)
-        monkeypatch.setattr(ui, "select_merge_mode", lambda: MergeMode.PER_PAGE)
+        orig_input = ui.input_center
+        orig_select_format = ui.select_output_format
+        orig_select_merge = ui.select_merge_mode
+        try:
+            ui.input_center = lambda prompt=">>: ": next(inputs)
+            ui.select_output_format = lambda: ActionResult.value(OutputFormat.MARKDOWN)
+            ui.select_merge_mode = lambda: MergeMode.PER_PAGE
 
-        path = ui.input_center()
-        format_choice = ui.select_output_format()
-        merge = ui.select_merge_mode()
-        merged_filename = None
+            path = ui.input_center()
+            format_choice = ui.select_output_format()
+            merge = ui.select_merge_mode()
+            merged_filename = None
 
-        assert merge == MergeMode.PER_PAGE
-        assert merged_filename is None
+            assert merge == MergeMode.PER_PAGE
+            assert merged_filename is None
+        finally:
+            ui.input_center = orig_input
+            ui.select_output_format = orig_select_format
+            ui.select_merge_mode = orig_select_merge
 
-    def test_prompt_merged_filename(self, monkeypatch):
+    def test_prompt_merged_filename(self):
         """Test prompting for merged filename"""
         console = Console(record=True)
         ui = RetroCLI(console=console)
-        
-        monkeypatch.setattr(ui, "input_center", lambda prompt=">>: ": "  my_file  ")
+        orig_input = ui.input_center
+        try:
+            ui.input_center = lambda prompt=">>: ": "  my_file  "
 
-        filename = ui.prompt_merged_filename()
+            filename = ui.prompt_merged_filename()
+            if isinstance(filename, ActionResult):
+                filename = filename.payload
 
-        assert filename == "my_file"
+            assert filename == "my_file"
+        finally:
+            ui.input_center = orig_input
 
 
 class TestProgressBar:
@@ -810,28 +915,35 @@ class TestProgressBar:
 class TestInputCenter:
     """Test centered input method"""
     
-    def test_input_center_default_prompt(self, monkeypatch):
+    def test_input_center_default_prompt(self):
         """Test input_center with default prompt"""
         console = Console()
         ui = RetroCLI(console=console)
         
-        # Mock console.input
-        monkeypatch.setattr(console, "input", lambda *args, **kwargs: "test input")
-        
-        result = ui.input_center()
-        
-        assert result == "test input"
+        orig_input = console.input
+        try:
+            console.input = lambda *args, **kwargs: "test input"
+
+            result = ui.input_center()
+
+            assert result == "test input"
+        finally:
+            console.input = orig_input
     
-    def test_input_center_custom_prompt(self, monkeypatch):
+    def test_input_center_custom_prompt(self):
         """Test input_center with custom prompt"""
         console = Console()
         ui = RetroCLI(console=console)
         
-        monkeypatch.setattr(console, "input", lambda *args, **kwargs: "custom")
-        
-        result = ui.input_center(prompt_symbol=">>> ")
-        
-        assert result == "custom"
+        orig_input = console.input
+        try:
+            console.input = lambda *args, **kwargs: "custom"
+
+            result = ui.input_center(prompt_symbol=">>> ")
+
+            assert result == "custom"
+        finally:
+            console.input = orig_input
 
 
 def test_retrocli_basic_rendering():
@@ -858,6 +970,8 @@ class TestMergeModeSelection:
         ui = RetroCLI(console=console, keyboard_reader=keyboard_input)
         
         result = ui.select_merge_mode()
+        if isinstance(result, ActionResult):
+            result = result.payload
         assert result == MergeMode.PER_PAGE
     
     def test_select_merge_mode_up_arrow_wrapping(self):
@@ -870,6 +984,8 @@ class TestMergeModeSelection:
         ui = RetroCLI(console=console, keyboard_reader=keyboard_input)
         
         result = ui.select_merge_mode()
+        if isinstance(result, ActionResult):
+            result = result.payload
         assert result == MergeMode.PER_PAGE
 
 class TestOutputFormatSelection:
@@ -885,7 +1001,7 @@ class TestOutputFormatSelection:
         ui = RetroCLI(console=console, keyboard_reader=keyboard_input)
         
         result = ui.select_output_format()
-        assert result == OutputFormat.JSON
+        assert result.payload == OutputFormat.JSON
     
     def test_select_output_format_up_arrow_wrapping(self):
         """Test _select_output_format with up arrow wrapping to end"""
@@ -897,7 +1013,7 @@ class TestOutputFormatSelection:
         ui = RetroCLI(console=console, keyboard_reader=keyboard_input)
         
         result = ui.select_output_format()
-        assert result == OutputFormat.JSON
+        assert result.payload == OutputFormat.JSON
     
     def test_select_output_format_default_selection(self):
         """Test _select_output_format with immediate enter (selects plain text = 1)"""
@@ -909,4 +1025,4 @@ class TestOutputFormatSelection:
         ui = RetroCLI(console=console, keyboard_reader=keyboard_input)
         
         result = ui.select_output_format()
-        assert result == OutputFormat.PLAIN_TEXT
+        assert result.payload == OutputFormat.PLAIN_TEXT

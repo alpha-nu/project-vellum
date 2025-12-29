@@ -1,5 +1,40 @@
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any, Optional, Callable
+from typing import List, Dict, Any, Optional, Callable, TypeVar, Generic
+from dataclasses import dataclass
+from enum import Enum, auto
+
+
+T = TypeVar("T")
+
+
+class ActionKind(Enum):
+    VALUE = auto()
+    BACK = auto()
+    QUIT = auto()
+    ERROR = auto()
+
+
+@dataclass
+class ActionResult(Generic[T]):
+    kind: ActionKind
+    payload: Optional[T] = None
+    message: Optional[str] = None
+
+    @classmethod
+    def value(cls, payload: T) -> "ActionResult[T]":
+        return cls(ActionKind.VALUE, payload=payload)
+
+    @classmethod
+    def back(cls) -> "ActionResult[None]":
+        return cls(ActionKind.BACK)
+
+    @classmethod
+    def quit(cls) -> "ActionResult[None]":
+        return cls(ActionKind.QUIT)
+
+    @classmethod
+    def error(cls, message: str) -> "ActionResult[None]":
+        return cls(ActionKind.ERROR, message=message)
 
 
 class UIInterface(ABC):
@@ -14,15 +49,11 @@ class UIInterface(ABC):
         pass
 
     @abstractmethod
-    def input_center(self, prompt_symbol: str) -> str:
+    def input_center(self, prompt_symbol: str) -> ActionResult[str]:
         pass
 
     @abstractmethod
     def draw_header(self):
-        pass
-
-    @abstractmethod
-    def clear_and_show_header(self):
         pass
 
     @abstractmethod
@@ -38,23 +69,27 @@ class UIInterface(ABC):
         pass
 
     @abstractmethod
-    def get_path_input(self) -> str:
+    def get_path_input(self) -> ActionResult[str]:
         pass
 
     @abstractmethod
-    def select_output_format(self):
+    def select_output_format(self) -> ActionResult:
         pass
 
     @abstractmethod
-    def select_merge_mode(self):
+    def select_merge_mode(self) -> ActionResult:
         pass
 
     @abstractmethod
-    def prompt_merged_filename(self) -> str:
+    def prompt_merged_filename(self) -> ActionResult[str]:
         pass
 
     @abstractmethod
     def get_progress_bar(self):
+        pass
+
+    @abstractmethod
+    def ask_again(self) -> ActionResult[bool]:
         pass
 
     @abstractmethod

@@ -1,7 +1,9 @@
 from dataclasses import dataclass, field
 from typing import Any, Optional, List
+from enum import Enum, auto
+from typing import Callable, Dict
+from dataclasses import dataclass
 
-# Holds all mutable, shared workflow data
 @dataclass
 class WorkflowContext:
     input_path: Optional[Any] = None
@@ -12,10 +14,6 @@ class WorkflowContext:
     merged_filename: Optional[str] = None
     error_message: Optional[str] = None
     error_origin: Optional['WorkflowState'] = None
-    # Add more fields as needed for workflow
-from enum import Enum, auto
-from typing import Callable, Dict
-from dataclasses import dataclass
 
 class WorkflowState(Enum):
     SOURCE_INPUT = auto()
@@ -25,7 +23,6 @@ class WorkflowState(Enum):
     PROCESSING = auto()
     COMPLETE = auto()
     ERROR = auto()
-
 
 @dataclass(frozen=True)
 class StateTransition:
@@ -41,7 +38,6 @@ WORKFLOW_TRANSITIONS: Dict[WorkflowState, StateTransition] = {
     WorkflowState.COMPLETE: StateTransition(WorkflowState.SOURCE_INPUT, None),
     WorkflowState.ERROR: StateTransition(WorkflowState.SOURCE_INPUT, None),
 }
-
 
 class WorkflowStateMachine:
     def __init__(self, initial_state: WorkflowState = WorkflowState.SOURCE_INPUT):
