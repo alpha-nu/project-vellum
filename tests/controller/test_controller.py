@@ -369,10 +369,10 @@ class TestSaveMergedOutput:
         accumulator = ["content"]
         
         filename, size = controller._save_merged_output(
-            mock_dir, mock_handler, accumulator, OutputFormat.JSON, None
+            mock_dir, mock_handler, accumulator, OutputFormat.JSON, "merged_default"
         )
-        
-        assert "merged_output" in filename
+
+        assert "merged_default" in filename
         assert ".json" in filename
     
     def test_default_filename_for_file(self, mock_converters, mock_handler):
@@ -384,9 +384,9 @@ class TestSaveMergedOutput:
         accumulator = ["content"]
         
         filename, size = controller._save_merged_output(
-            mock_file, mock_handler, accumulator, OutputFormat.PLAIN_TEXT, None
+            mock_file, mock_handler, accumulator, OutputFormat.PLAIN_TEXT, "source_merged"
         )
-        
+
         assert "source_merged" in filename
 
 

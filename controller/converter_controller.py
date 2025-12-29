@@ -247,12 +247,12 @@ class ConverterController:
         return content, output_count, output_size
     
     def _save_merged_output(
-        self, 
-        input_path: PathLike, 
-        handler: OutputHandler, 
+        self,
+        input_path: PathLike,
+        handler: OutputHandler,
         accumulator: List[str],
         format_choice: OutputFormat,
-        merged_filename: Optional[str] = None
+        merged_filename: str,
     ) -> tuple[str, int]:
         """
         Save merged output to single file.
@@ -269,18 +269,17 @@ class ConverterController:
             - filename: Name of the merged output file with extension
             - output_size: Size of the merged output file
         """
-        if merged_filename:
-            output_name = input_path / merged_filename if input_path.is_dir() else input_path.with_name(merged_filename)
-        elif input_path.is_dir():
-            output_name = input_path / "merged_output"
+        # Place merged file inside `input_path` if it's a directory,
+        # otherwise place it adjacent to the input file using `with_name()`
+        # so this works with Path-like mocks used in tests.
+        if input_path.is_dir():
+            output_name = input_path / merged_filename
         else:
-            output_name = input_path.with_name(f"{input_path.stem}_merged")
-        
+            output_name = input_path.with_name(merged_filename)
         output_size = handler.save("\n\n".join(accumulator), output_name)
-        
         # Compute the actual filename with extension
         actual_filename = output_name.with_suffix(format_choice.extension).name
-        
+
         return actual_filename, output_size
 
     def _get_converter(self, file_path: PathLike):
