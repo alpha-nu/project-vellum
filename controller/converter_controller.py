@@ -59,24 +59,21 @@ class ConverterController:
             False to indicate the workflow should stop. When `loop` is True, returns None.
         """
         def run_once() -> bool:
+            handlers: Dict[WorkflowState, Callable[[], Optional[bool]]] = {
+                WorkflowState.SOURCE_INPUT: self._handle_source_input,
+                WorkflowState.ERROR: self._handle_error,
+                WorkflowState.FORMAT_SELECTION: self._handle_format_selection,
+                WorkflowState.MERGE_MODE_SELECTION: self._handle_merge_mode_selection,
+                WorkflowState.FILES_SELECTION: self._handle_files_selection,
+                WorkflowState.PROCESSING: self._handle_processing,
+                WorkflowState.COMPLETE: self._handle_complete,
+            }
+
             current_state = self.state_machine.get_state()
-
-            if current_state == WorkflowState.SOURCE_INPUT:
-                self._handle_source_input()
-            elif current_state == WorkflowState.ERROR:
-                return self._handle_error()
-            elif current_state == WorkflowState.FORMAT_SELECTION:
-                self._handle_format_selection()
-            elif current_state == WorkflowState.MERGE_MODE_SELECTION:
-                self._handle_merge_mode_selection()
-            elif current_state == WorkflowState.FILES_SELECTION:
-                self._handle_files_selection()
-            elif current_state == WorkflowState.PROCESSING:
-                self._handle_processing()
-            elif current_state == WorkflowState.COMPLETE:
-                return self._handle_complete()
-
-            return True
+            result = handlers.get(current_state)()
+            if result is None:
+                return True
+            return result
 
         if not loop:
             return run_once()
