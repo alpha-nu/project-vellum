@@ -170,7 +170,7 @@ class RetroCLI(UIInterface):
             text = f"[{self.colors['primary']}]{display_name}[/] {hint}"
         return f"{marker} {radio} {text}"
 
-    def _radio_select(self, options: list, title: str):
+    def _radio_select(self, options: list, title: str) -> ActionResult:
         """Generic radio-button selection menu.
         
         Args:
@@ -181,7 +181,7 @@ class RetroCLI(UIInterface):
             Selected option from the list
         """
         current_index = 0
-        hints = f"[{self.colors['secondary']}]⬆︎ /⬇︎[/] :navigate  [{self.colors['secondary']}][ENTER][/]:confirm  [{self.colors['secondary']}][BACKSPACE][/]:back"
+        hints = f"[{self.colors['secondary']}]⬆︎ /⬇︎[/] :navigate  [{self.colors['secondary']}][ENTER][/]:confirm  [{self.colors['secondary']}][BACKSPACE][/]:back  [{self.colors['secondary']}][Q][/]:quit"
         
         while True:
             self.console.clear()
@@ -200,14 +200,17 @@ class RetroCLI(UIInterface):
             token = self.keyboard_reader()
 
             if token.key == KeyboardKey.BACKSPACE:
-                return None
+                return ActionResult.back()
+
+            if token.key == KeyboardKey.CHAR and token.char == "q":
+                return ActionResult.terminate()
 
             if token.key == KeyboardKey.UP:
                 current_index = (current_index - 1) % len(options)
             elif token.key == KeyboardKey.DOWN:
                 current_index = (current_index + 1) % len(options)
             elif token.key == KeyboardKey.ENTER:
-                return options[current_index]
+                return ActionResult.value(options[current_index])
 
     def print_center(self, renderable):
         """Print a renderable centered within the configured console width."""
@@ -267,7 +270,7 @@ class RetroCLI(UIInterface):
         """
         selected_indices = []
         current_index = 0
-        hints = f"[{self.colors['secondary']}]⬆︎ /⬇︎[/] :navigate  [{self.colors['secondary']}][SPACE][/]:select  [{self.colors['secondary']}][A][/]:all  [{self.colors['secondary']}][ENTER][/]:confirm  [{self.colors['secondary']}][Q][/]:quit"
+        hints = f"[{self.colors['secondary']}]⬆︎ /⬇︎[/] :navigate  [{self.colors['secondary']}][SPACE][/]:select  [{self.colors['secondary']}][A][/]:all  [{self.colors['secondary']}][ENTER][/]:confirm  [{self.colors['secondary']}][BACKSPACE][/]:back  [{self.colors['secondary']}][Q][/]:quit"
         
         while True:
             self.console.clear()
@@ -304,6 +307,8 @@ class RetroCLI(UIInterface):
                     selected_indices.append(current_index)
             elif token.key == KeyboardKey.ENTER:
                 break
+            elif token.key == KeyboardKey.BACKSPACE:
+                return ActionResult.back()
             elif token.key == KeyboardKey.CHAR and token.char == "a":
                 if len(selected_indices) == len(file_data):
                     selected_indices = []
@@ -328,24 +333,17 @@ class RetroCLI(UIInterface):
 
     def select_output_format(self) -> ActionResult[OutputFormat]:
         """Interactive output format selection menu."""
-        result = self._radio_select(
+        return self._radio_select(
             [OutputFormat.PLAIN_TEXT, OutputFormat.MARKDOWN, OutputFormat.JSON],
             title="select output format"
         )
-        # If radio returned None, treat as BACK; otherwise wrap the selected value.
-        if result is None:
-            return ActionResult.back()
-        return ActionResult.value(result)
 
     def select_merge_mode(self) -> ActionResult[MergeMode]:
         """Interactive merge mode selection menu."""
-        result = self._radio_select(
+        return self._radio_select(
             [MergeMode.NO_MERGE, MergeMode.MERGE, MergeMode.PER_PAGE],
             title="select merge mode"
         )
-        if result is None:
-            return ActionResult.back()
-        return ActionResult.value(result)
 
     def prompt_merged_filename(self) -> ActionResult[str]:
         """Prompt user for the name of the merged output file."""
