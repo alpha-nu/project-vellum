@@ -1,13 +1,13 @@
 import pytest
-from controller.workflow.state_machine import WorkflowState, WorkflowStateMachine
+from controller.workflow.state_machine import WorkflowState, ConversionWorkflow
 
 def test_initial_state():
-    sm = WorkflowStateMachine()
+    sm = ConversionWorkflow()
     assert sm.get_state() == WorkflowState.SOURCE_INPUT
     assert not sm.can_go_back()
 
 def test_forward_and_backwards_transitions():
-    sm = WorkflowStateMachine()
+    sm = ConversionWorkflow()
     # Forward through all states
     for _ in range(5):
         sm.next()
@@ -19,7 +19,7 @@ def test_forward_and_backwards_transitions():
     assert not sm.can_go_back()
 
 def test_partial_backwards():
-    sm = WorkflowStateMachine()
+    sm = ConversionWorkflow()
     sm.next() 
     sm.next() 
     sm.next() 
@@ -32,7 +32,7 @@ def test_partial_backwards():
     assert not sm.can_go_back()
 
 def test_reset():
-    sm = WorkflowStateMachine()
+    sm = ConversionWorkflow()
     sm.context.files = ["file1", "file2"]
     sm.next()
     sm.next()

@@ -329,6 +329,7 @@ class TestRunOnceExtra:
         ui.select_files.return_value = ActionResult.terminate()
 
         controller = ConverterController(ui, {'.pdf': lambda p: None}, {}, lambda s: mock_dir)
+        controller.state_machine.context.compatible_files = []
         files = controller._get_files_to_process(mock_dir)
         assert files == []
 
@@ -698,6 +699,10 @@ class TestControllerAdditionalBranches:
         ui.select_files.return_value = ActionResult.back()
 
         controller = ConverterController(ui, {'.pdf': lambda p: None}, {}, lambda s: mock_dir)
+        # runtime would cache compatible files; test should provide them explicitly
+        controller.state_machine.context.compatible_files = [
+            MockPathBuilder().with_suffix('.pdf').with_stem('x').build()
+        ]
         files = controller._get_files_to_process(mock_dir)
         assert files == []
 
@@ -740,6 +745,11 @@ class TestControllerAdditionalBranches:
         ui.select_files.return_value = ActionResult.value([0, 1])
 
         controller = ConverterController(ui, {'.pdf': lambda p: None, '.epub': lambda p: None}, {}, lambda s: mock_dir)
+        # runtime would cache compatible files; test should provide them explicitly
+        controller.state_machine.context.compatible_files = [
+            MockPathBuilder().with_suffix('.pdf').with_stem('a').build(),
+            MockPathBuilder().with_suffix('.epub').with_stem('b').build(),
+        ]
         files = controller._get_files_to_process(mock_dir)
         assert len(files) == 2
         assert files[0].name == 'a.pdf'

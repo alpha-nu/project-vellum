@@ -39,7 +39,7 @@ WORKFLOW_TRANSITIONS: Dict[WorkflowState, StateTransition] = {
     WorkflowState.ERROR: StateTransition(WorkflowState.SOURCE_INPUT, None),
 }
 
-class WorkflowStateMachine:
+class ConversionWorkflow:
     def __init__(self, initial_state: WorkflowState = WorkflowState.SOURCE_INPUT):
         self.state = initial_state
         self.state_stack: List[WorkflowState] = []

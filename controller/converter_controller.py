@@ -17,7 +17,7 @@ from domain.core.output_handler import OutputHandler
 from domain.core.base_converter import BaseConverter
 from domain.model.file import File
 from domain.adapters.file_factories import file_from_path
-from controller.workflow.state_machine import WorkflowState, WorkflowStateMachine
+from controller.workflow.state_machine import WorkflowState, ConversionWorkflow
 from view.interface import ActionResult, ActionKind
 
 
@@ -43,9 +43,8 @@ class ConverterController:
         self.converters = converters
         self.handlers = handlers
         self.path_factory = path_factory
-        # Injectable factory to convert Path-like objects to domain File
         self.file_factory = file_factory
-        self.state_machine = WorkflowStateMachine()
+        self.state_machine = ConversionWorkflow()
 
     def run(self, loop: bool = True):
         """Run the workflow.
@@ -105,7 +104,7 @@ class ConverterController:
             List of files to process
         """
         if input_path.is_dir():
-            compatible_files = self._get_compatible_files(input_path)
+            compatible_files = self.state_machine.context.compatible_files
             file_data = [self.file_factory(path).to_dict() for path in compatible_files]
             result = self.ui.select_files(file_data)
             if result.kind != ActionKind.VALUE:
