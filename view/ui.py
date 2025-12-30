@@ -219,7 +219,7 @@ class RetroCLI(UIInterface):
 
     def input_center(self, prompt_symbol=">>: "):
         term_width = self.console.size.width
-        left_padding = (term_width - self.panel_width) // 2
+        left_padding = (term_width - self.panel_width) // 2 + 1
         prompt_str = " " * left_padding + prompt_symbol
         markup = f"[{self.colors['primary']}]" + prompt_str + "[/]"
         return self.console.input(markup, markup=True)
@@ -392,7 +392,10 @@ class RetroCLI(UIInterface):
         self.print_center(panel)
 
     def show_error(self, message: str):
-        self.print_panel(message, content_color_key="error")
+        markup = f"[{self.colors['error']}]" + message + "[/]"
+        term_width = self.console.size.width
+        left_padding = (term_width - self.panel_width) // 2 + 1
+        self.console.print(" " * left_padding + markup, markup=True)
 
     def show_conversion_summary(
         self, 
