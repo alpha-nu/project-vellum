@@ -72,7 +72,6 @@ class ConverterController:
             current_state = self.state_machine.get_state()
             result = handlers.get(current_state)()
 
-
             if result.kind == ActionKind.BACK:
                 if self.state_machine.can_go_back():
                     self.state_machine.back()
@@ -88,10 +87,7 @@ class ConverterController:
             if result.kind == ActionKind.PROCEED:
                 return True
 
-            # VALUE: handler returned a VALUE ActionResult. If the payload is a bool,
-            # treat it as the loop continuation flag; otherwise default to continue.
-            payload = result.payload
-            return payload if isinstance(payload, bool) else True
+            return True
 
         if not loop:
             return run_once()
