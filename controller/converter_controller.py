@@ -310,6 +310,16 @@ class ConverterController:
         if not input_path.exists():
             return ActionResult.error("path not found")
 
+        if input_path.is_dir():
+            compatible_files = self._get_compatible_files(input_path)
+            if not compatible_files:
+                return ActionResult.error("no compatible files found in directory")
+        else:
+            if input_path.suffix.lower() not in self.converters:
+                return ActionResult.error("selected file type is not supported")
+            compatible_files = [input_path]
+
+        self.state_machine.context.compatible_files = compatible_files
         self.state_machine.context.input_path = input_path
         self.state_machine.next()
         return ActionResult.proceed()
@@ -343,10 +353,9 @@ class ConverterController:
 
     def _handle_files_selection(self):
         input_path = self.state_machine.context.input_path
+        compatible_files = self.state_machine.context.compatible_files
 
-        # If input is a directory, prompt user to select files (may return ActionResult)
         if input_path.is_dir():
-            compatible_files = self._get_compatible_files(input_path)
             file_data = [self.file_factory(path).to_dict() for path in compatible_files]
             result = self.ui.select_files(file_data)
             if result.kind != ActionKind.VALUE:

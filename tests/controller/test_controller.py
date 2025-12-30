@@ -160,17 +160,14 @@ class TestRunOnce:
         path_factory = lambda s: mock_path
         controller = ConverterController(ui, mock_converters, handlers, path_factory)
 
-        # Drive to FILES_SELECTION which will set ERROR
-        controller.run(loop=False)  # SOURCE_INPUT
-        controller.run(loop=False)  # FORMAT_SELECTION
-        controller.run(loop=False)  # MERGE_MODE_SELECTION
-        controller.run(loop=False)  # FILES_SELECTION -> sets ERROR
-
-        # Handle ERROR: ask_again -> True, should restore to FILES_SELECTION
-        result = controller.run(loop=False)
+        # With early compatibility validation, the ERROR will be raised at SOURCE_INPUT.
+        # First run transitions to ERROR; handling it with ask_again -> True should
+        # restore to SOURCE_INPUT.
+        controller.run(loop=False)  # SOURCE_INPUT -> sets ERROR
+        result = controller.run(loop=False)  # ERROR -> ask_again -> restore
 
         assert result is True
-        assert controller.state_machine.get_state() == WorkflowState.FILES_SELECTION
+        assert controller.state_machine.get_state() == WorkflowState.SOURCE_INPUT
 
     def test_error_retry_with_no_origin_resets(self, mock_converters, mock_handler):
         """If an ERROR has no origin, retry should reset the workflow."""
@@ -627,6 +624,10 @@ class TestActionResultHandling:
 
         # Ensure there is an input_path in context for the handler to inspect
         controller.state_machine.context.input_path = MockPathBuilder().with_is_dir(True).build()
+        # Also provide compatible_files since we're bypassing _handle_source_input
+        controller.state_machine.context.compatible_files = [
+            MockPathBuilder().with_suffix('.pdf').with_stem('x').build()
+        ]
 
         result = controller.run(loop=False)
 
@@ -663,7 +664,7 @@ class TestSaveMergedOutputExtra:
         assert size == 123
 
 
-    def test_save_merged_output_with_file_parent(self, tmp_path):
+    def test_save_merged_output_with_file_parent(self):
         ui = MagicMock()
         handlers = {OutputFormat.MARKDOWN: lambda: MagicMock(save=MagicMock(return_value=55))}
 
@@ -833,6 +834,59 @@ def test_handle_error_proceed_with_no_origin_resets_and_returns_proceed():
     assert result.kind == ActionKind.PROCEED
     # reset should put state back to SOURCE_INPUT
     assert controller.state_machine.get_state() == WorkflowState.SOURCE_INPUT
+
+
+def test_handle_source_input_unsupported_file_returns_error():
+    ui = MagicMock()
+    ui.get_path_input.return_value = ActionResult.value("file.docx")
+
+    mock_path = MockPathBuilder().with_is_dir(False).with_suffix('.docx').with_exists(True).build()
+    controller = ConverterController(ui, {}, {OutputFormat.PLAIN_TEXT: lambda: MagicMock()}, lambda s: mock_path)
+
+    result = controller._handle_source_input()
+    assert isinstance(result, ActionResult)
+    assert result.kind == ActionKind.ERROR
+    assert "not supported" in result.message
+
+
+def test_handle_files_selection_value_selects_files():
+    ui = MagicMock()
+    controller = ConverterController(ui, {}, {OutputFormat.PLAIN_TEXT: lambda: MagicMock()}, lambda s: None)
+
+    # prepare context as if we are in FILES_SELECTION with a directory input
+    controller.state_machine.next()
+    controller.state_machine.next()
+    controller.state_machine.next()
+    controller.state_machine.context.input_path = MockPathBuilder().with_is_dir(True).build()
+    p1 = MockPathBuilder().with_suffix('.pdf').with_stem('a').build()
+    p2 = MockPathBuilder().with_suffix('.pdf').with_stem('b').build()
+    controller.state_machine.context.compatible_files = [p1, p2]
+
+    ui.select_files.return_value = ActionResult.value([1])
+
+    res = controller._handle_files_selection()
+    assert res.kind == ActionKind.PROCEED
+    assert controller.state_machine.context.files == [p2]
+
+
+def test_handle_files_selection_no_files_selected_returns_error_and_moves_back():
+    ui = MagicMock()
+    controller = ConverterController(ui, {}, {OutputFormat.PLAIN_TEXT: lambda: MagicMock()}, lambda s: None)
+
+    # advance to FILES_SELECTION so back() will pop a previous state
+    controller.state_machine.next()
+    controller.state_machine.next()
+    controller.state_machine.next()
+
+    controller.state_machine.context.input_path = MockPathBuilder().with_is_dir(True).build()
+    controller.state_machine.context.compatible_files = [MockPathBuilder().with_suffix('.pdf').with_stem('x').build()]
+
+    ui.select_files.return_value = ActionResult.value([])
+
+    res = controller._handle_files_selection()
+    assert isinstance(res, ActionResult)
+    assert res.kind == ActionKind.ERROR
+    assert "no files selected" in res.message
 
 
 
