@@ -9,7 +9,7 @@ from view.merge_mode import MergeMode
 from view.output_format import OutputFormat
 from controller.workflow.state_machine import WorkflowState
 from unittest.mock import MagicMock
-from view.interface import ActionResult
+from view.interface import ActionResult, ActionKind
 
 
 class TestGetConverter:
@@ -635,5 +635,117 @@ class TestSaveMergedOutputExtra:
 
         assert filename.endswith(OutputFormat.MARKDOWN.extension)
         assert size == 55
+
+
+class TestControllerAdditionalBranches:
+    """Additional small branch tests moved from temporary file.
+    These exercise small branches in `converter_controller` to reach full coverage.
+    """
+
+    def test_get_files_to_process_back_returns_empty_list(self):
+        ui = MagicMock()
+        # directory with one compatible file
+        mock_dir = (
+            MockPathBuilder('/dir')
+            .with_exists(True)
+            .with_is_dir(True)
+            .with_files([MockPathBuilder().with_suffix('.pdf').with_stem('x').build()])
+            .build()
+        )
+        ui.select_files.return_value = ActionResult.back()
+
+        controller = ConverterController(ui, {'.pdf': lambda p: None}, {}, lambda s: mock_dir)
+        files = controller._get_files_to_process(mock_dir)
+        assert files == []
+
+    def test_merge_mode_prompt_value_sets_merged_filename(self):
+        ui = MagicMock()
+        ui.select_merge_mode.return_value = ActionResult.value(MergeMode.MERGE)
+        ui.prompt_merged_filename.return_value = ActionResult.value('custom_name')
+
+        controller = ConverterController(ui, {}, {OutputFormat.PLAIN_TEXT: lambda: MagicMock()}, lambda s: None)
+
+        result = controller._handle_merge_mode_selection()
+        assert result.kind == ActionKind.VALUE
+        assert controller.state_machine.context.merged_filename == 'custom_name'
+
+    def test_complete_nonvalue_ask_again_quits(self):
+        ui = MagicMock()
+        ui.ask_again.return_value = ActionResult.quit()
+
+        controller = ConverterController(ui, {}, {OutputFormat.PLAIN_TEXT: lambda: MagicMock()}, lambda s: None)
+        # move to COMPLETE state
+        controller.state_machine.state = WorkflowState.COMPLETE
+
+        res = controller.run(loop=False)
+        assert res is False
+
+    def test_get_files_to_process_value_returns_selected_files(self):
+        ui = MagicMock()
+        
+        mock_dir = (
+            MockPathBuilder('/dir')
+            .with_exists(True)
+            .with_is_dir(True)
+            .with_files([
+                MockPathBuilder().with_suffix('.pdf').with_stem('a').build(),
+                MockPathBuilder().with_suffix('.epub').with_stem('b').build(),
+                MockPathBuilder().with_suffix('.txt').with_stem('c').build(),
+            ])
+            .build()
+        )
+        ui.select_files.return_value = ActionResult.value([0, 1])
+
+        controller = ConverterController(ui, {'.pdf': lambda p: None, '.epub': lambda p: None}, {}, lambda s: mock_dir)
+        files = controller._get_files_to_process(mock_dir)
+        assert len(files) == 2
+        assert files[0].name == 'a.pdf'
+        assert files[1].name == 'b.epub'
+
+    def test_merge_mode_select_nonvalue_returns_quit(self):
+        ui = MagicMock()
+        ui.select_merge_mode.return_value = ActionResult.quit()
+
+        controller = ConverterController(ui, {}, {OutputFormat.PLAIN_TEXT: lambda: MagicMock()}, lambda s: None)
+
+        res = controller._handle_merge_mode_selection()
+        assert res.kind == ActionKind.QUIT
+
+    def test_merge_mode_prompt_nonvalue_returns_quit(self):
+        ui = MagicMock()
+        ui.select_merge_mode.return_value = ActionResult.value(MergeMode.MERGE)
+        ui.prompt_merged_filename.return_value = ActionResult.quit()
+
+        controller = ConverterController(ui, {}, {OutputFormat.PLAIN_TEXT: lambda: MagicMock()}, lambda s: None)
+
+        res = controller._handle_merge_mode_selection()
+        assert res.kind == ActionKind.QUIT
+
+    def test_handle_error_ask_again_nonvalue_returns_quit(self):
+        ui = MagicMock()
+        ui.ask_again.return_value = ActionResult.quit()
+
+        controller = ConverterController(ui, {}, {OutputFormat.PLAIN_TEXT: lambda: MagicMock()}, lambda s: None)
+        controller.state_machine.context.error_message = 'boom'
+        controller.state_machine.state = WorkflowState.ERROR
+
+        res = controller._handle_error()
+        assert res.kind == ActionKind.QUIT
+
+    def test_handle_error_retry_no_origin_resets_and_proceeds(self):
+        ui = MagicMock()
+        ui.ask_again.return_value = ActionResult.value(True)
+
+        controller = ConverterController(ui, {}, {OutputFormat.PLAIN_TEXT: lambda: MagicMock()}, lambda s: None)
+        
+        controller.state_machine.context.error_origin = None
+        controller.state_machine.context.error_message = 'transient'
+        controller.state_machine.state = WorkflowState.ERROR
+
+        res = controller._handle_error()
+        assert res.kind == ActionKind.VALUE
+        assert res.payload is True
+        # After reset, state should be SOURCE_INPUT
+        assert controller.state_machine.get_state().name == 'SOURCE_INPUT'
 
 

@@ -16,8 +16,8 @@ from view.output_format import OutputFormat
 from domain.core.output_handler import OutputHandler
 from domain.core.base_converter import BaseConverter
 from domain.model.file import File
-from enum import Enum
-from controller.workflow.state_machine import WorkflowState, WorkflowStateMachine, WorkflowContext
+from domain.adapters.file_factories import file_from_path
+from controller.workflow.state_machine import WorkflowState, WorkflowStateMachine
 from view.interface import ActionResult, ActionKind
 
 
@@ -35,13 +35,16 @@ class ConverterController:
         ui: UIInterface,
         converters: ConverterMap,
         handlers: HandlerMap,
-        path_factory: PathFactory
+        path_factory: PathFactory,
+        file_factory: Callable[[PathLike], File] = file_from_path,
     ):
        
         self.ui = ui
         self.converters = converters
         self.handlers = handlers
         self.path_factory = path_factory
+        # Injectable factory to convert Path-like objects to domain File
+        self.file_factory = file_factory
         self.state_machine = WorkflowStateMachine()
 
     def run(self, loop: bool = True):
@@ -109,7 +112,7 @@ class ConverterController:
         """
         if input_path.is_dir():
             compatible_files = self._get_compatible_files(input_path)
-            file_data = [File.from_path(path).to_dict() for path in compatible_files]
+            file_data = [self.file_factory(path).to_dict() for path in compatible_files]
             result = self.ui.select_files(file_data)
             if result.kind != ActionKind.VALUE:
                 return []
@@ -352,7 +355,7 @@ class ConverterController:
         # If input is a directory, prompt user to select files (may return ActionResult)
         if input_path.is_dir():
             compatible_files = self._get_compatible_files(input_path)
-            file_data = [File.from_path(path).to_dict() for path in compatible_files]
+            file_data = [self.file_factory(path).to_dict() for path in compatible_files]
             result = self.ui.select_files(file_data)
             if result.kind != ActionKind.VALUE:
                 return result

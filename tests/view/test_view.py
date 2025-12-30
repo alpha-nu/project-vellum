@@ -21,6 +21,7 @@ from view.interface import ActionResult, ActionKind
 from view.keyboard import KeyboardToken, KeyboardKey
 
 from domain.model.file import File
+from domain.adapters.file_factories import file_from_path
 
 
 # ===== Keyboard Mock Helper =====
@@ -502,7 +503,7 @@ class TestInteractiveSelection:
     @staticmethod
     def _paths_to_file_data(paths):
         """Convert Path objects to file data dicts for view."""
-        return [File.from_path(p).to_dict() for p in paths]
+        return [file_from_path(p).to_dict() for p in paths]
     
     def test_select_files_enter_immediately(self, tmp_path):
         """Test selecting files by pressing enter immediately (no selection)"""
