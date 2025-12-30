@@ -25,6 +25,31 @@ class ActionResult(Generic[T]):
         return cls(ActionKind.VALUE, payload=payload)
 
     @classmethod
+    def ok(cls) -> "ActionResult[None]":
+        """Convenience for a VALUE result with no control/data payload.
+
+        Use this when the caller wants to signal a successful VALUE without
+        providing a payload that the caller of `run()` might interpret as
+        loop-control (i.e. a boolean).
+        """
+        return cls(ActionKind.VALUE, payload=None)
+
+    @classmethod
+    def proceed(cls) -> "ActionResult[None]":
+        """Convenience representing a VALUE result that signals the
+        controller run-loop to continue. This is equivalent to
+        `ActionResult.value(True)`.
+        """
+        return cls(ActionKind.VALUE, payload=True)
+
+    @classmethod
+    def stop(cls) -> "ActionResult[None]":
+        """Convenience representing a VALUE result that signals "stop" to the
+        controller run-loop. This is equivalent to `ActionResult.value(False)`.
+        """
+        return cls(ActionKind.VALUE, payload=False)
+
+    @classmethod
     def back(cls) -> "ActionResult[None]":
         return cls(ActionKind.BACK)
 

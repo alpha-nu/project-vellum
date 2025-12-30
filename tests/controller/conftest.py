@@ -49,13 +49,15 @@ class MockUIBuilder:
                 self.show_conversion_summary = MagicMock()
                 # ask_again returns True on first call (if configured), False thereafter
                 from view.interface import ActionResult
-                self.ask_again = MagicMock(side_effect=[ActionResult.value(builder.run_again), ActionResult.value(False)] if builder.run_again else [ActionResult.value(False)])
+                if builder.run_again:
+                    side = [ActionResult.proceed(), ActionResult.stop()]
+                else:
+                    side = [ActionResult.stop()]
+                self.ask_again = MagicMock(side_effect=side)
             
             def draw_header(self):
                 pass
             
-            def clear_and_show_header(self):
-                pass
             
             def get_path_input(self):
                 from view.interface import ActionResult

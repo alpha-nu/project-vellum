@@ -18,21 +18,20 @@ class TestGetConverter:
     def test_returns_converter_for_supported_extension(self, mock_converter):
         ui = MockUIBuilder().build()
         controller = ConverterController(ui, {".pdf": mock_converter}, {}, lambda s: None)
-        
+
         mock_path = MockPathBuilder().with_suffix(".pdf").build()
-        converter = controller._get_converter(mock_path)
-        
+        converter = controller.converters['.pdf'](mock_path)
+
         assert converter is not None
         assert hasattr(converter, 'extract_content')
     
     def test_returns_none_for_unsupported_extension(self, mock_converter):
         ui = MockUIBuilder().build()
         controller = ConverterController(ui, {".pdf": mock_converter}, {}, lambda s: None)
-        
+
         mock_path = MockPathBuilder().with_suffix(".docx").build()
-        converter = controller._get_converter(mock_path)
-        
-        assert converter is None
+        with pytest.raises(KeyError):
+            _ = controller.converters[mock_path.suffix](mock_path)
 
 
 class TestGetCompatibleFiles:
@@ -65,18 +64,18 @@ class TestGetFormatHandler:
     def test_returns_handler_for_valid_format(self, mock_handler):
         ui = MockUIBuilder().build()
         controller = ConverterController(ui, {}, {OutputFormat.PLAIN_TEXT: lambda: mock_handler}, lambda s: None)
-        
-        handler = controller._get_format_handler(OutputFormat.PLAIN_TEXT)
-        
+
+        handler = controller.handlers[OutputFormat.PLAIN_TEXT]()
+
         assert handler is not None
         assert hasattr(handler, 'save')
     
     def test_raises_for_unknown_format(self):
         ui = MockUIBuilder().build()
         controller = ConverterController(ui, {}, {}, lambda s: None)
-        
-        with raises(ValueError, match="Unknown output format"):
-            controller._get_format_handler(OutputFormat.PLAIN_TEXT)
+
+        with raises(KeyError):
+            _ = controller.handlers[OutputFormat.PLAIN_TEXT]()
 
 
 class TestRun:
@@ -226,12 +225,16 @@ class TestRunOnce:
 
         controller = ConverterController(ui, mock_converters, handlers, lambda s: None)
 
-        # Manually set ERROR state with no origin
-        controller.state_machine.context.error_message = "transient"
-        controller.state_machine.context.error_origin = None
-        controller.state_machine.state = WorkflowState.ERROR
+        # Simulate a handler returning ERROR on the initial SOURCE_INPUT step.
+        # The first run transitions into ERROR, the second run handles the ERROR
+        # and (because ask_again is configured True) resets the workflow.
+        from unittest.mock import MagicMock
+        ui.get_path_input = MagicMock(return_value=ActionResult.error("transient"))
 
-        result = controller.run(loop=False)
+        controller = ConverterController(ui, mock_converters, handlers, lambda s: None)
+
+        controller.run(loop=False)  # SOURCE_INPUT -> sets ERROR
+        result = controller.run(loop=False)  # ERROR -> ask_again -> reset
 
         assert result is True
         assert controller.state_machine.get_state() == WorkflowState.SOURCE_INPUT
@@ -369,13 +372,8 @@ class TestProcessSingleFile:
         # Unsupported extension
         mock_file = MockPathBuilder().with_suffix(".docx").with_stem("test").build()
         
-        content, count, size = controller._process_single_file(
-            mock_file, 1, MockProgress(), mock_handler, MergeMode.NO_MERGE
-        )
-        
-        assert content is None
-        assert count == 0
-        assert size == 0
+        with pytest.raises(KeyError):
+            controller._process_single_file(mock_file, 1, MockProgress(), mock_handler, MergeMode.NO_MERGE)
     
     def test_processes_supported_file_successfully(self, mock_converters, mock_handler, mock_pdf_path):
         """Test that a supported file is processed and returns content."""

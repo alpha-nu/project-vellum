@@ -208,10 +208,7 @@ class ConverterController:
             start_time=file_start,
         )
         
-        # Get converter
-        converter = self._get_converter(file)
-        if not converter:
-            return None, 0, 0
+        converter = self.converters[file.suffix.lower()](file)
         
         # Create progress callback
         def progress_callback(current, total):
@@ -296,10 +293,7 @@ class ConverterController:
 
         return actual_filename, output_size
 
-    def _get_converter(self, file_path: PathLike):
-        ext = file_path.suffix.lower()
-        converter_class = self.converters.get(ext)
-        return converter_class(file_path) if converter_class else None
+    # Removed `_get_converter` helper — lookup inlined where used.
     
     def _get_compatible_files(self, directory: PathLike) -> List[PathLike]:
         supported_extensions = list(self.converters.keys())
@@ -308,11 +302,7 @@ class ConverterController:
             if f.suffix.lower() in supported_extensions
         ]
     
-    def _get_format_handler(self, format_choice: OutputFormat) -> OutputHandler:
-        handler_class = self.handlers.get(format_choice)
-        if handler_class is None:
-            raise ValueError(f"Unknown output format: {format_choice}")
-        return handler_class()
+    # Removed `_get_format_handler` helper — lookup inlined where used.
 
     def _handle_source_input(self):
         result = self.ui.get_path_input()
@@ -323,15 +313,11 @@ class ConverterController:
         input_path = self.path_factory(input_str)
 
         if not input_path.exists():
-            ctx = self.state_machine.context
-            ctx.error_message = "path not found"
-            ctx.error_origin = WorkflowState.SOURCE_INPUT
-            self.state_machine.state = WorkflowState.ERROR
-            return ActionResult.value(True)
+            return ActionResult.error("path not found")
 
         self.state_machine.context.input_path = input_path
         self.state_machine.next()
-        return ActionResult.value(True)
+        return ActionResult.ok()
 
     def _handle_format_selection(self):
         result = self.ui.select_output_format()
@@ -341,7 +327,7 @@ class ConverterController:
 
         self.state_machine.context.format_choice = format_choice
         self.state_machine.next()
-        return ActionResult.value(True)
+        return ActionResult.ok()
 
     def _handle_merge_mode_selection(self):
         result = self.ui.select_merge_mode()
@@ -358,7 +344,7 @@ class ConverterController:
             self.state_machine.context.merged_filename = merged_filename
 
         self.state_machine.next()
-        return ActionResult.value(True)
+        return ActionResult.ok()
 
     def _handle_files_selection(self):
         input_path = self.state_machine.context.input_path
@@ -376,20 +362,15 @@ class ConverterController:
             files = [input_path]
 
         if not files:
-            ctx = self.state_machine.context
-            ctx.error_message = "no compatible files found"
-            ctx.error_origin = WorkflowState.FILES_SELECTION
-            self.state_machine.state = WorkflowState.ERROR
-            return ActionResult.value(True)
+            return ActionResult.error("no compatible files found")
 
         self.state_machine.context.files = files
         self.state_machine.next()
-        return ActionResult.value(True)
+        return ActionResult.ok()
 
     def _handle_processing(self):
         context = self.state_machine.context
-        handler = self._get_format_handler(context.format_choice)
-        context.handler = handler
+        context.handler = (handler := self.handlers[context.format_choice]())
 
         total_input_size = sum(file.stat().st_size for file in context.files)
         
@@ -423,8 +404,7 @@ class ConverterController:
             single_output_filename=single_output_filename
         )
         self.state_machine.next()
-        return ActionResult.value(True)
-
+        return ActionResult.ok()
 
     def _handle_complete(self) -> bool:
         try:
@@ -433,14 +413,14 @@ class ConverterController:
                 return result
             run_again = result.payload
         except Exception:
-            return ActionResult.value(False)
+            return ActionResult.stop()
 
         if run_again:
             self.state_machine.reset()
-            return ActionResult.value(True)
+            return ActionResult.proceed()
         else:
             self.state_machine.next()
-            return ActionResult.value(False)
+            return ActionResult.stop()
 
     def _handle_error(self) -> bool:
         """Handle transient errors: show message and use `ask_again()` for retry/quit.
@@ -464,9 +444,9 @@ class ConverterController:
 
             if origin is not None:
                 self.state_machine.state = origin
-                return ActionResult.value(True)
+                return ActionResult.proceed()
             # Fallback: reset workflow
             self.state_machine.reset()
-            return ActionResult.value(True)
+            return ActionResult.proceed()
         else:
-            return ActionResult.value(False)
+            return ActionResult.stop()

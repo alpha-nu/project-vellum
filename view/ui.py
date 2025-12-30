@@ -446,7 +446,7 @@ class RetroCLI(UIInterface):
         while True:
             token = self.keyboard_reader()
             if token.key == KeyboardKey.ENTER:
-                return ActionResult.value(True)
+                return ActionResult.proceed()
             elif token.key == KeyboardKey.CHAR and token.char == "q":
                 return ActionResult.quit()
             # Else continue waiting
