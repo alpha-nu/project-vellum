@@ -92,11 +92,8 @@ class ConverterController:
         if not loop:
             return run_once()
 
-        # loop == True: run until a step returns False
-        while True:
-            again = run_once()
-            if not again:
-                break
+        while run_once():
+            ...
 
     def _get_files_to_process(self, input_path: PathLike) -> List[PathLike]:
         """
