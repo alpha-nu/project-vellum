@@ -186,7 +186,6 @@ class RetroCLI(UIInterface):
         while True:
             self.console.clear()
             self.draw_header()
-
             table = self._create_selection_table()
             for i, option in enumerate(options):
                 table.add_row(self._render_radio_row(
@@ -273,7 +272,6 @@ class RetroCLI(UIInterface):
         while True:
             self.console.clear()
             self.draw_header()
-
             table = self._create_selection_table()
             
             for i, file_info in enumerate(file_data):
@@ -323,7 +321,6 @@ class RetroCLI(UIInterface):
         """Get path input from user."""
         self.console.clear()
         self.draw_header()
-
         prompt = f"[{self.colors['primary']}]provide a file or directory path[/] [{self.colors['secondary']}](e.g. source.pdf or /data)[/]"
         self.print_center(self._create_panel(prompt))
         result = self.input_center()
@@ -354,7 +351,6 @@ class RetroCLI(UIInterface):
         """Prompt user for the name of the merged output file."""
         self.console.clear()
         self.draw_header()
-
         prompt = f"[{self.colors['primary']}]enter name for merged output file[/] [{self.colors['secondary']}](without extension)[/]"
         self.print_center(self._create_panel(prompt))
         result = self.input_center().strip()
@@ -438,7 +434,6 @@ class RetroCLI(UIInterface):
             padding=(1, 0, 0, 1),
             title_color="confirm"
         ))
-
 
     def ask_again(self) -> ActionResult[bool]:
         hints = f"[{self.colors['secondary']}][ENTER][/]:run another conversion  [{self.colors['secondary']}][Q][/]:quit"
