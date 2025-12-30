@@ -72,9 +72,8 @@ class ConverterController:
             current_state = self.state_machine.get_state()
             result = handlers.get(current_state)()
 
-            if result.kind == ActionKind.BACK:
-                if self.state_machine.can_go_back():
-                    self.state_machine.back()
+            if result.kind == ActionKind.BACK and self.state_machine.can_go_back():
+                self.state_machine.back()
                 return True
             if result.kind == ActionKind.TERMINATE:
                 return False
@@ -291,8 +290,6 @@ class ConverterController:
 
         return actual_filename, output_size
 
-    # Removed `_get_converter` helper — lookup inlined where used.
-    
     def _get_compatible_files(self, directory: PathLike) -> List[PathLike]:
         supported_extensions = list(self.converters.keys())
         return [
@@ -300,13 +297,13 @@ class ConverterController:
             if f.suffix.lower() in supported_extensions
         ]
     
-    # Removed `_get_format_handler` helper — lookup inlined where used.
-
     def _handle_source_input(self):
         result = self.ui.get_path_input()
         if result.kind != ActionKind.VALUE:
             return result
-        input_str = result.payload
+        
+        if not (input_str := result.payload):
+            return ActionResult.error("please provide a source file or directory")
 
         input_path = self.path_factory(input_str)
 
@@ -315,7 +312,7 @@ class ConverterController:
 
         self.state_machine.context.input_path = input_path
         self.state_machine.next()
-        return ActionResult.value(None)
+        return ActionResult.proceed()
 
     def _handle_format_selection(self):
         result = self.ui.select_output_format()
@@ -325,7 +322,7 @@ class ConverterController:
 
         self.state_machine.context.format_choice = format_choice
         self.state_machine.next()
-        return ActionResult.value(None)
+        return ActionResult.proceed()
 
     def _handle_merge_mode_selection(self):
         result = self.ui.select_merge_mode()
@@ -342,7 +339,7 @@ class ConverterController:
             self.state_machine.context.merged_filename = merged_filename
 
         self.state_machine.next()
-        return ActionResult.value(None)
+        return ActionResult.proceed()
 
     def _handle_files_selection(self):
         input_path = self.state_machine.context.input_path
@@ -360,7 +357,8 @@ class ConverterController:
             files = [input_path]
 
         if not files:
-            return ActionResult.error("no compatible files found")
+            self.state_machine.back()
+            return ActionResult.error("no files selected")
 
         self.state_machine.context.files = files
         self.state_machine.next()
@@ -405,22 +403,7 @@ class ConverterController:
         return ActionResult.proceed()
 
     def _handle_complete(self) -> bool:
-        try:
-            result = self.ui.ask_again()
-        except Exception:
-            return ActionResult.terminate()
-
-        # Accept either VALUE(bool) or explicit PROCEED/TERMINATE kinds
-        if result.kind == ActionKind.VALUE:
-            run_again = bool(result.payload)
-        elif result.kind == ActionKind.PROCEED:
-            run_again = True
-        elif result.kind == ActionKind.TERMINATE:
-            return result
-        else:
-            return result
-
-        if run_again:
+        if self.ui.ask_again().kind == ActionKind.PROCEED:
             self.state_machine.reset()
             return ActionResult.proceed()
         else:
@@ -435,19 +418,8 @@ class ConverterController:
         """
         msg = self.state_machine.context.error_message
         self.ui.show_error(msg)
-        result = self.ui.ask_again()
 
-        # Accept either VALUE(bool) or explicit PROCEED/TERMINATE kinds
-        if result.kind == ActionKind.VALUE:
-            run_again = bool(result.payload)
-        elif result.kind == ActionKind.PROCEED:
-            run_again = True
-        elif result.kind == ActionKind.TERMINATE:
-            return result
-        else:
-            return result
-
-        if run_again:
+        if self.ui.ask_again().kind == ActionKind.PROCEED:
             # On retry, return to the originating state if available.
             origin = self.state_machine.context.error_origin
             # Clear error fields

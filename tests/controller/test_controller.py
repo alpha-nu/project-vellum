@@ -112,32 +112,6 @@ class TestRunOnce:
         assert "path not found" in ui.show_error.call_args[0][0]
         assert result is False
     
-    def test_no_compatible_files_shows_error_and_quits(self, mock_converters, mock_handler):
-        ui = MockUIBuilder("/some/dir").build()
-        handlers = {OutputFormat.PLAIN_TEXT: lambda: mock_handler}
-        
-        # Directory with no compatible files
-        mock_path = (
-            MockPathBuilder("/some/dir")
-            .with_exists(True)
-            .with_is_dir(True)
-            .with_files([
-                MockPathBuilder().with_suffix(".txt").with_stem("readme").build(),
-            ])
-            .build()
-        )
-        path_factory = lambda s: mock_path
-        controller = ConverterController(ui, mock_converters, handlers, path_factory)
-        
-        # Drive controller through source -> format -> merge -> files selection
-        controller.run(loop=False)  # SOURCE_INPUT
-        controller.run(loop=False)  # FORMAT_SELECTION
-        controller.run(loop=False)  # MERGE_MODE_SELECTION
-        controller.run(loop=False)  # FILES_SELECTION -> set ERROR
-        controller.run(loop=False)  # ERROR -> show error and ask_again
-        ui.show_error.assert_called_once()
-        assert "no compatible files found" in ui.show_error.call_args[0][0]
-    
     def test_successful_single_file_conversion(self, mock_converters, mock_handler, mock_pdf_path):
         ui = MockUIBuilder("test.pdf").build()
         handlers = {OutputFormat.PLAIN_TEXT: lambda: mock_handler}
@@ -168,26 +142,6 @@ class TestRunOnce:
         result = controller.run(loop=False)
 
         assert result is True
-    
-    def test_ask_again_exception_returns_quit(self, mock_converters, mock_handler, mock_pdf_path):
-        """Test that exception in ask_again results in QUIT."""
-        ui = MockUIBuilder("test.pdf").build()
-        handlers = {OutputFormat.PLAIN_TEXT: lambda: mock_handler}
-        
-        # Override ask_again to raise exception
-        def raise_exception():
-            raise NotImplementedError()
-        ui.ask_again = raise_exception
-        
-        controller = ConverterController(ui, mock_converters, handlers, mock_pdf_path)
-        
-        # Drive until summary and then handle COMPLETE which should quit on exception
-        while not ui.show_conversion_summary.called:
-            controller.run(loop=False)
-
-        result = controller.run(loop=False)
-
-        assert result is False
 
     def test_error_retry_restores_origin(self, mock_converters, mock_handler):
         """If an ERROR has an origin, retrying should return to that state."""
@@ -256,18 +210,6 @@ def test_run_once_transitions_to_error_state_on_error_result_extra():
     assert controller.state_machine.state == WorkflowState.ERROR
     assert controller.state_machine.context.error_message == "boom"
 
-
-def test_handle_complete_returns_nonvalue_action_extra():
-    ui = MagicMock()
-    ui.ask_again.return_value = ActionResult.back()
-    controller = make_controller(ui)
-    controller.state_machine.state = WorkflowState.COMPLETE
-
-    result = controller._handle_complete()
-    assert isinstance(result, ActionResult)
-    assert result.kind == ActionKind.BACK
-
-
 def test_handle_complete_terminate_returns_result_extra():
     ui = MagicMock()
     ui.ask_again.return_value = ActionResult.terminate()
@@ -329,40 +271,6 @@ def test_run_once_handles_terminate_from_handler_extra():
     res = controller.run(loop=False)
     assert res is False
 
-
-def test_handle_complete_ask_again_raises_exception_returns_terminate_extra():
-    ui = MagicMock()
-    ui.ask_again.side_effect = Exception("boom")
-    controller = make_controller(ui)
-    controller.state_machine.state = WorkflowState.COMPLETE
-
-    result = controller._handle_complete()
-    assert isinstance(result, ActionResult)
-    assert result.kind == ActionKind.TERMINATE
-
-
-def test_handle_complete_nonstandard_kind_passes_through_extra():
-    ui = MagicMock()
-    ui.ask_again.return_value = ActionResult.error("unclear")
-    controller = make_controller(ui)
-    controller.state_machine.state = WorkflowState.COMPLETE
-
-    result = controller._handle_complete()
-    assert isinstance(result, ActionResult)
-    assert result.kind == ActionKind.ERROR
-
-
-def test_handle_complete_value_true_proceeds_extra():
-    ui = MagicMock()
-    ui.ask_again.return_value = ActionResult.value(True)
-    controller = make_controller(ui)
-    controller.state_machine.state = WorkflowState.COMPLETE
-
-    result = controller._handle_complete()
-    assert isinstance(result, ActionResult)
-    assert result.kind == ActionKind.PROCEED
-
-
 def test_handle_complete_value_false_terminates_extra():
     ui = MagicMock()
     ui.ask_again.return_value = ActionResult.value(False)
@@ -373,17 +281,6 @@ def test_handle_complete_value_false_terminates_extra():
     assert isinstance(result, ActionResult)
     assert result.kind == ActionKind.TERMINATE
 
-
-def test_handle_error_returns_nonvalue_action_extra():
-    ui = MagicMock()
-    ui.ask_again.return_value = ActionResult.back()
-    controller = make_controller(ui)
-    controller.state_machine.state = WorkflowState.ERROR
-    controller.state_machine.context.error_message = "boom"
-
-    result = controller._handle_error()
-    assert isinstance(result, ActionResult)
-    assert result.kind == ActionKind.BACK
 
 class TestRunOnceExtra:
     """Additional run_once behavior tests migrated from separate file.
@@ -811,7 +708,7 @@ class TestControllerAdditionalBranches:
         controller = ConverterController(ui, {}, {OutputFormat.PLAIN_TEXT: lambda: MagicMock()}, lambda s: None)
 
         result = controller._handle_merge_mode_selection()
-        assert result.kind == ActionKind.VALUE
+        assert result.kind == ActionKind.PROCEED
         assert controller.state_machine.context.merged_filename == 'custom_name'
 
     def test_complete_nonvalue_ask_again_quits(self):
@@ -877,20 +774,65 @@ class TestControllerAdditionalBranches:
         res = controller._handle_error()
         assert res.kind == ActionKind.TERMINATE
 
-    def test_handle_error_retry_no_origin_resets_and_proceeds(self):
-        ui = MagicMock()
-        ui.ask_again.return_value = ActionResult.value(True)
 
-        controller = ConverterController(ui, {}, {OutputFormat.PLAIN_TEXT: lambda: MagicMock()}, lambda s: None)
-        
-        controller.state_machine.context.error_origin = None
-        controller.state_machine.context.error_message = 'transient'
-        controller.state_machine.state = WorkflowState.ERROR
+def test_handle_source_input_empty_payload_returns_error():
+    ui = MagicMock()
+    ui.get_path_input.return_value = ActionResult.value("")
 
-        res = controller._handle_error()
-        assert res.kind == ActionKind.PROCEED
-        assert res.payload is None
-        # After reset, state should be SOURCE_INPUT
-        assert controller.state_machine.get_state().name == 'SOURCE_INPUT'
+    # path factory shouldn't be called when payload is empty, but provide a stub
+    controller = make_controller(ui)
+
+    result = controller._handle_source_input()
+    assert isinstance(result, ActionResult)
+    assert result.kind == ActionKind.ERROR
+    assert "provide a source" in result.message
+
+
+def test_handle_error_with_origin_restores_state():
+    ui = MagicMock()
+    # ask_again returns a proceed ActionResult
+    ui.ask_again.return_value = ActionResult.proceed()
+
+    controller = make_controller(ui)
+    # set error context and an origin state
+    controller.state_machine.context.error_message = "boom"
+    controller.state_machine.context.error_origin = WorkflowState.FORMAT_SELECTION
+    controller.state_machine.state = WorkflowState.ERROR
+
+    result = controller._handle_error()
+    assert isinstance(result, ActionResult)
+    assert result.kind == ActionKind.PROCEED
+    # state should be restored to origin
+    assert controller.state_machine.get_state() == WorkflowState.FORMAT_SELECTION
+
+
+def test_run_once_back_without_history_returns_true_and_keeps_state():
+    ui = MagicMock()
+    ui.get_path_input.return_value = ActionResult.back()
+
+    controller = make_controller(ui)
+    # initial state has no back history
+    assert controller.state_machine.can_go_back() is False
+
+    res = controller.run(loop=False)
+    assert res is True
+    assert controller.state_machine.get_state().name == 'SOURCE_INPUT'
+
+
+def test_handle_error_proceed_with_no_origin_resets_and_returns_proceed():
+    ui = MagicMock()
+    ui.ask_again.return_value = ActionResult.proceed()
+
+    controller = make_controller(ui)
+    controller.state_machine.context.error_message = 'boom'
+    controller.state_machine.context.error_origin = None
+    controller.state_machine.state = WorkflowState.ERROR
+
+    result = controller._handle_error()
+    assert isinstance(result, ActionResult)
+    assert result.kind == ActionKind.PROCEED
+    # reset should put state back to SOURCE_INPUT
+    assert controller.state_machine.get_state() == WorkflowState.SOURCE_INPUT
+
 
 
