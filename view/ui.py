@@ -312,7 +312,7 @@ class RetroCLI(UIInterface):
                 else:
                     selected_indices = list(range(len(file_data)))
             elif token.key == KeyboardKey.CHAR and token.char == "q":
-                return ActionResult.quit()
+                return ActionResult.terminate()
 
         self.console.clear()
         self.draw_header()
@@ -448,6 +448,6 @@ class RetroCLI(UIInterface):
             if token.key == KeyboardKey.ENTER:
                 return ActionResult.proceed()
             elif token.key == KeyboardKey.CHAR and token.char == "q":
-                return ActionResult.quit()
+                return ActionResult.terminate()
             # Else continue waiting
 

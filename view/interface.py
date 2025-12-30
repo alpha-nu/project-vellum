@@ -10,8 +10,9 @@ T = TypeVar("T")
 class ActionKind(Enum):
     VALUE = auto()
     BACK = auto()
-    QUIT = auto()
     ERROR = auto()
+    PROCEED = auto()
+    TERMINATE = auto()
 
 
 @dataclass
@@ -24,15 +25,6 @@ class ActionResult(Generic[T]):
     def value(cls, payload: T) -> "ActionResult[T]":
         return cls(ActionKind.VALUE, payload=payload)
 
-    @classmethod
-    def ok(cls) -> "ActionResult[None]":
-        """Convenience for a VALUE result with no control/data payload.
-
-        Use this when the caller wants to signal a successful VALUE without
-        providing a payload that the caller of `run()` might interpret as
-        loop-control (i.e. a boolean).
-        """
-        return cls(ActionKind.VALUE, payload=None)
 
     @classmethod
     def proceed(cls) -> "ActionResult[None]":
@@ -40,23 +32,16 @@ class ActionResult(Generic[T]):
         controller run-loop to continue. This is equivalent to
         `ActionResult.value(True)`.
         """
-        return cls(ActionKind.VALUE, payload=True)
+        return cls(ActionKind.PROCEED)
+
 
     @classmethod
-    def stop(cls) -> "ActionResult[None]":
-        """Convenience representing a VALUE result that signals "stop" to the
-        controller run-loop. This is equivalent to `ActionResult.value(False)`.
-        """
-        return cls(ActionKind.VALUE, payload=False)
+    def terminate(cls) -> "ActionResult[None]":
+        return cls(ActionKind.TERMINATE)
 
     @classmethod
     def back(cls) -> "ActionResult[None]":
         return cls(ActionKind.BACK)
-
-    @classmethod
-    def quit(cls) -> "ActionResult[None]":
-        return cls(ActionKind.QUIT)
-
     @classmethod
     def error(cls, message: str) -> "ActionResult[None]":
         return cls(ActionKind.ERROR, message=message)

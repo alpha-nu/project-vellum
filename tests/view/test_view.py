@@ -467,7 +467,14 @@ class TestSelectionMethods:
         ui = RetroCLI(console=console, keyboard_reader=keyboard_reader)
         res = ui.ask_again()
         if isinstance(res, ActionResult):
-            res = res.payload
+            if res.kind == ActionKind.VALUE:
+                res = res.payload
+            elif res.kind == ActionKind.PROCEED:
+                res = True
+            elif res.kind == ActionKind.TERMINATE:
+                res = False
+            else:
+                res = None
         assert res is True
 
         # Test 'q' -> False
@@ -477,7 +484,7 @@ class TestSelectionMethods:
         if isinstance(res, ActionResult):
             if res.kind == ActionKind.VALUE:
                 res = res.payload
-            elif res.kind == ActionKind.QUIT:
+            elif res.kind == ActionKind.TERMINATE:
                 res = False
             else:
                 res = None
@@ -492,7 +499,12 @@ class TestSelectionMethods:
         ui = RetroCLI(console=console, keyboard_reader=keyboard_reader)
         res = ui.ask_again()
         if isinstance(res, ActionResult):
-            res = res.payload
+            if res.kind == ActionKind.VALUE:
+                res = res.payload
+            elif res.kind == ActionKind.PROCEED:
+                res = True
+            else:
+                res = None
         assert res is True
 
 
@@ -630,12 +642,12 @@ class TestInteractiveSelection:
         ui = RetroCLI(console=console, keyboard_reader=keyboard_reader)
         
         file_data = self._paths_to_file_data(files)
-        # The UI may now return an ActionResult.quit() instead of raising SystemExit
+        # The UI may now return an ActionResult.terminate() instead of raising SystemExit
         try:
             res = ui.select_files(file_data)
             if isinstance(res, ActionResult):
-                # Expect a quit action
-                assert res.kind.name == 'QUIT'
+                # Expect a terminate action
+                assert res.kind.name == 'TERMINATE'
         except SystemExit as exc:
             assert exc.code == 0
     def test_select_files_all_toggle_deselect(self, tmp_path):

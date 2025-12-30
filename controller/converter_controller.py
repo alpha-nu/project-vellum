@@ -77,13 +77,15 @@ class ConverterController:
                 if self.state_machine.can_go_back():
                     self.state_machine.back()
                 return True
-            if result.kind == ActionKind.QUIT:
+            if result.kind == ActionKind.TERMINATE:
                 return False
             if result.kind == ActionKind.ERROR:
                 # Set error in context and transition to ERROR state
                 self.state_machine.context.error_message = result.message
                 self.state_machine.context.error_origin = current_state
                 self.state_machine.state = WorkflowState.ERROR
+                return True
+            if result.kind == ActionKind.PROCEED:
                 return True
 
             # VALUE: handler returned a VALUE ActionResult. If the payload is a bool,
@@ -320,7 +322,7 @@ class ConverterController:
 
         self.state_machine.context.input_path = input_path
         self.state_machine.next()
-        return ActionResult.ok()
+        return ActionResult.value(None)
 
     def _handle_format_selection(self):
         result = self.ui.select_output_format()
@@ -330,7 +332,7 @@ class ConverterController:
 
         self.state_machine.context.format_choice = format_choice
         self.state_machine.next()
-        return ActionResult.ok()
+        return ActionResult.value(None)
 
     def _handle_merge_mode_selection(self):
         result = self.ui.select_merge_mode()
@@ -347,7 +349,7 @@ class ConverterController:
             self.state_machine.context.merged_filename = merged_filename
 
         self.state_machine.next()
-        return ActionResult.ok()
+        return ActionResult.value(None)
 
     def _handle_files_selection(self):
         input_path = self.state_machine.context.input_path
@@ -369,7 +371,7 @@ class ConverterController:
 
         self.state_machine.context.files = files
         self.state_machine.next()
-        return ActionResult.ok()
+        return ActionResult.proceed()
 
     def _handle_processing(self):
         context = self.state_machine.context
@@ -407,23 +409,30 @@ class ConverterController:
             single_output_filename=single_output_filename
         )
         self.state_machine.next()
-        return ActionResult.ok()
+        return ActionResult.proceed()
 
     def _handle_complete(self) -> bool:
         try:
             result = self.ui.ask_again()
-            if result.kind != ActionKind.VALUE:
-                return result
-            run_again = result.payload
         except Exception:
-            return ActionResult.stop()
+            return ActionResult.terminate()
+
+        # Accept either VALUE(bool) or explicit PROCEED/TERMINATE kinds
+        if result.kind == ActionKind.VALUE:
+            run_again = bool(result.payload)
+        elif result.kind == ActionKind.PROCEED:
+            run_again = True
+        elif result.kind == ActionKind.TERMINATE:
+            return result
+        else:
+            return result
 
         if run_again:
             self.state_machine.reset()
             return ActionResult.proceed()
         else:
             self.state_machine.next()
-            return ActionResult.stop()
+            return ActionResult.terminate()
 
     def _handle_error(self) -> bool:
         """Handle transient errors: show message and use `ask_again()` for retry/quit.
@@ -434,9 +443,16 @@ class ConverterController:
         msg = self.state_machine.context.error_message
         self.ui.show_error(msg)
         result = self.ui.ask_again()
-        if result.kind != ActionKind.VALUE:
+
+        # Accept either VALUE(bool) or explicit PROCEED/TERMINATE kinds
+        if result.kind == ActionKind.VALUE:
+            run_again = bool(result.payload)
+        elif result.kind == ActionKind.PROCEED:
+            run_again = True
+        elif result.kind == ActionKind.TERMINATE:
             return result
-        run_again = result.payload
+        else:
+            return result
 
         if run_again:
             # On retry, return to the originating state if available.
@@ -452,4 +468,4 @@ class ConverterController:
             self.state_machine.reset()
             return ActionResult.proceed()
         else:
-            return ActionResult.stop()
+            return ActionResult.terminate()

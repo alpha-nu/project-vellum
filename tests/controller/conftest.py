@@ -50,9 +50,9 @@ class MockUIBuilder:
                 # ask_again returns True on first call (if configured), False thereafter
                 from view.interface import ActionResult
                 if builder.run_again:
-                    side = [ActionResult.proceed(), ActionResult.stop()]
+                    side = [ActionResult.proceed(), ActionResult.terminate()]
                 else:
-                    side = [ActionResult.stop()]
+                    side = [ActionResult.terminate()]
                 self.ask_again = MagicMock(side_effect=side)
             
             def draw_header(self):
