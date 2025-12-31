@@ -19,6 +19,7 @@ from view.merge_mode import MergeMode
 from view.interface import UIInterface, ActionResult
 from view.keyboard import KeyboardKey
 from sys import stdout
+from rich.box import HORIZONTALS, HEAVY_HEAD
 
 
 class _StyledTimeMixin:
@@ -68,7 +69,6 @@ class StyledTimeElapsedColumn(_StyledTimeMixin, TimeRemainingColumn):
         # Pending or no start time
         return Text("00:00", style=self._style)
 
-
 class StyledPercentageColumn(TextColumn):
     def __init__(self, colors: dict):
         super().__init__("{task.percentage:>3.0f}%")
@@ -83,7 +83,6 @@ class StyledPercentageColumn(TextColumn):
             return Text.from_markup(f"[{self.colors['confirm']}]{percentage}[/]")
         else:
             return Text.from_markup(f"[{self.colors['accented']}]{percentage}[/]")
-
 
 class StyledDescriptionColumn(TextColumn):
     def __init__(self, colors: dict):
@@ -101,7 +100,6 @@ class StyledDescriptionColumn(TextColumn):
             return Text.from_markup(f"[{self.colors['confirm']}]✓ {filename}[/]")
         else:
             return Text.from_markup(f"[{self.colors['subtle']}]{filename}[/]")
-
 
 class RetroCLI(UIInterface):
     def __init__(self, console: Optional[Console] = None, max_width: int = 120, colors: Optional[dict] = None, keyboard_reader=None):
@@ -128,15 +126,15 @@ class RetroCLI(UIInterface):
         """Compute constrained panel width based on terminal and max width."""
         return min(self.max_width, self.console.size.width)
 
-    def _create_panel(self, content, title: Optional[str] = None, padding: Optional[tuple] = None, title_color: Optional[str] = None) -> Panel:
+    def _create_panel(self, content, title: Optional[str] = None, padding: Optional[tuple] = None, title_color: Optional[str] = "primary") -> Panel:
         """Create a styled panel with consistent settings."""
-        color = title_color or "primary"
         kwargs = {
             "border_style": self.colors["subtle"],
             "width": self.panel_width,
+            "box": HORIZONTALS,
         }
         if title:
-            kwargs["title"] = f"[{self.colors[color]}]\\[{title}][/ ]"
+            kwargs["title"] = f"[{self.colors[title_color]}]\\[{title}][/ ]"
             kwargs["title_align"] = "left"
         if padding:
             kwargs["padding"] = padding
@@ -146,8 +144,9 @@ class RetroCLI(UIInterface):
         """Create a panel for keyboard navigation hints."""
         return Panel(
             f"[{self.colors['primary']}]{hints}[/]",
-            border_style=self.colors["subtle"],
+            border_style=f"dim {self.colors["subtle"]}",
             width=self.panel_width,
+            box=HEAVY_HEAD,
         )
 
     def _create_selection_table(self) -> Table:
@@ -196,7 +195,7 @@ class RetroCLI(UIInterface):
                     option.display_hint
                 ))
 
-            self.print_center(self._create_panel(table, title=title, padding=(1, 0, 0, 0)))
+            self.print_center(self._create_panel(table, title=title, padding=(1, 0, 1, 0)))
             self.print_center(self._create_hint_panel(hints))
 
             token = self.keyboard_reader()
@@ -221,15 +220,17 @@ class RetroCLI(UIInterface):
 
     def input_center(self, prompt_symbol=">>", title = "", hint = ""):
         left_padding = (self.console.size.width - self.panel_width) // 2 + 3
-        markup = f"[{self.colors['subtle']}]{hint}[/]\n\n" + \
+        markup = (
+            f"[{self.colors['subtle']}]{hint}[/]\n\n"
             f"[{self.colors['primary']}]{prompt_symbol}[/]"
-        self.print_center(self._create_panel(markup, title, padding=(1, 0, 1, 1)))
+            )
+        self.print_center(self._create_panel(Text.from_markup(markup), title, padding=(1, 0, 0, 1)))
 
         hints = f"[{self.colors['secondary']}][ENTER][/]:confirm  [{self.colors['secondary']}][:Q][/]:quit"
         self.print_center(self._create_hint_panel(hints))
         
         # Some Magic to hijack and reposition the blinking cursos
-        stdout.write("\033[6A") # More Magic: move up 6 lines. The hight of the hints panel + padding
+        stdout.write("\033[5A") # More Magic: move up 6 lines. The hight of the hints panel + padding
         stdout.write(f"\033[{len(prompt_symbol) + left_padding}C") # move left
         stdout.flush()
         user_input = input("") 
@@ -244,7 +245,6 @@ class RetroCLI(UIInterface):
         self.draw_header()
 
     def draw_header(self):
-        self.VERSION = "[ epub | pdf -> txt: converter ] v.1.0.0"
         ascii_logo = """
     ██╗   ██╗███████╗██╗     ██╗     ██╗   ██╗███╗   ███╗
     ██║   ██║██╔════╝██║     ██║     ██║   ██║████╗ ████║
@@ -253,7 +253,7 @@ class RetroCLI(UIInterface):
      ╚████╔╝ ███████╗███████╗███████╗╚██████╔╝██║ ╚═╝ ██║
       ╚═══╝  ╚══════╝╚══════╝╚══════╝ ╚═════╝ ╚═╝     ╚═╝
         """
-        subtitle = f"{self.VERSION}"
+        subtitle = f"[ epub | pdf -> txt: converter ]"
         logo_width = max(len(line) for line in ascii_logo.splitlines())
         subtitle_width = len(subtitle) - 1
         padding = (logo_width - subtitle_width) // 2
@@ -261,16 +261,15 @@ class RetroCLI(UIInterface):
         self.print_center(
             Panel(
                 Align.center(
-                    Text(ascii_logo, style=self.colors["logo"]) + Text(
-                        "\n" + " " * padding + subtitle.lower(),
-                        style=f"{self.colors['primary']}",
-                    )
+                    Text(ascii_logo, style=self.colors["logo"]) + 
+                    Text("\n" + " ".ljust(padding) + subtitle.lower(), style=f"{self.colors['secondary']}")
                 ),
-                border_style=self.colors["subtle"],
+                border_style=f"dim {self.colors["subtle"]}",
                 width=self.panel_width,
+                box=HEAVY_HEAD,
             )
         )
- 
+
     def select_files(self, file_data: list[dict]) -> ActionResult[list[int]]:
         """Display file selector and return indices of selected files.
         
@@ -303,7 +302,7 @@ class RetroCLI(UIInterface):
                     size_text = f"[{self.colors['subtle']}]({file_info['size']})[/]"
                 table.add_row(f"{marker} {checkbox_colored} {filename_text} {size_text}")
 
-            self.print_center(self._create_panel(table, title="select files for conversion", padding=(1, 0, 0, 0)))
+            self.print_center(self._create_panel(table, title="select files for conversion", padding=(1, 0, 1, 0)))
             self.print_center(self._create_hint_panel(hints))
 
             token = self.keyboard_reader()
@@ -389,11 +388,7 @@ class RetroCLI(UIInterface):
                 transient=True,
             )
 
-            panel = Panel(
-                progress,
-                border_style=self.colors["subtle"],
-                width=self.panel_width,
-            )
+            panel = self._create_panel(progress, title="selected files", padding=(1, 0, 1, 0))
             term_width = self.console.size.width
             centered = Align.center(panel, width=term_width)
             with Live(centered, console=self.console, refresh_per_second=10):
@@ -436,18 +431,17 @@ class RetroCLI(UIInterface):
             f"[{self.colors['primary']}]output created:{'':<5}[/] [{self.colors['secondary']}]{output_desc}[/]\n"
             f"[{self.colors['primary']}]input size:{'':<9}[/] [{self.colors['secondary']}]{total_input_size_formatted}[/]\n"
             f"[{self.colors['primary']}]output size:{'':<8}[/] [{self.colors['secondary']}]{total_output_size_formatted}[/]\n\n"
-            f"[{self.colors['accented']}]total runtime:{'':<6} {runtime_str}[/]\n"
+            f"[{self.colors['accented']}]total runtime:{'':<6} {runtime_str}[/]"
         )
         
         self.print_center(self._create_panel(
             Text.from_markup(content), 
             title="conversion complete", 
-            padding=(1, 0, 0, 1),
-            title_color="confirm"
+            padding=(1, 0, 1, 1),
         ))
 
     def ask_again(self) -> ActionResult[bool]:
-        hints = f"[{self.colors['secondary']}][ENTER][/]:run another conversion  [{self.colors['secondary']}][Q][/]:quit"
+        hints = f"[{self.colors['secondary']}][ENTER][/]:try again  [{self.colors['secondary']}][Q][/]:quit"
         self.print_center(self._create_hint_panel(hints))
         while True:
             token = self.keyboard_reader()

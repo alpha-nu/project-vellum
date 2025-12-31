@@ -467,7 +467,6 @@ class TestSelectionMethods:
         # Verify header is shown and initial content is still there (console.clear() in record mode doesn't actually clear)
         text = console.export_text()
         assert "converter" in text.lower()
-        assert "v.1.0.0" in text
 
     def test_ask_again_enter_and_quit(self):
         """ask_again should return True for Enter and False for 'q'"""
