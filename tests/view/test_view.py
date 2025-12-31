@@ -106,18 +106,6 @@ class TestRetroCLIBasics:
         
         text = console.export_text()
         assert "Test content" in text
-    
-    def test_print_panel(self):
-        """Test panel printing with different colors"""
-        console = Console(record=True)
-        ui = RetroCLI(console=console)
-        
-        ui.print_panel("test message", content_color_key="primary")
-        ui.print_panel("error message", content_color_key="error")
-        
-        text = console.export_text()
-        assert "test message" in text
-        assert "error message" in text
 
 
 class TestProgressColumns:
@@ -873,19 +861,15 @@ class TestUserInput:
 
     def test_prompt_merged_filename(self):
         """Test prompting for merged filename"""
+        from unittest.mock import Mock
         console = Console(record=True)
         ui = RetroCLI(console=console)
-        orig_input = ui.input_center
-        try:
-            ui.input_center = lambda prompt=">>: ": "  my_file  "
-
-            filename = ui.prompt_merged_filename()
-            if isinstance(filename, ActionResult):
-                filename = filename.payload
-
-            assert filename == "my_file"
-        finally:
-            ui.input_center = orig_input
+        ui.input_center = Mock(return_value="  my_file  ")
+        filename = ui.prompt_merged_filename()
+        ui.input_center.assert_called_once()
+        if isinstance(filename, ActionResult):
+            filename = filename.payload
+        assert filename == "my_file"
 
 
 class TestProgressBar:
@@ -926,31 +910,26 @@ class TestInputCenter:
         """Test input_center with default prompt"""
         console = Console()
         ui = RetroCLI(console=console)
-        
-        orig_input = console.input
+        orig_input = __import__("builtins").input
         try:
-            console.input = lambda *args, **kwargs: "test input"
-
+            # Patch built-in input to avoid OSError
+            __import__("builtins").input = lambda *args, **kwargs: "test input"
             result = ui.input_center()
-
             assert result == "test input"
         finally:
-            console.input = orig_input
-    
+            __import__("builtins").input = orig_input
+
     def test_input_center_custom_prompt(self):
         """Test input_center with custom prompt"""
         console = Console()
         ui = RetroCLI(console=console)
-        
-        orig_input = console.input
+        orig_input = __import__("builtins").input
         try:
-            console.input = lambda *args, **kwargs: "custom"
-
+            __import__("builtins").input = lambda *args, **kwargs: "custom"
             result = ui.input_center(prompt_symbol=">>> ")
-
             assert result == "custom"
         finally:
-            console.input = orig_input
+            __import__("builtins").input = orig_input
 
 
 def test_retrocli_basic_rendering():
@@ -960,7 +939,7 @@ def test_retrocli_basic_rendering():
 
     # Should not raise
     ui.draw_header()
-    ui.print_panel("hello world")
+    ui.print_center("hello world")
     ui.show_error("something went wrong")
 
 
@@ -1039,27 +1018,21 @@ class TestQuitHandlers:
     """Tests for handlers that accept ':q' to quit/terminate."""
 
     def test_get_path_input_colon_q_terminates(self):
+        from unittest.mock import Mock
         console = Console(record=True)
         ui = RetroCLI(console=console)
-        ui.input_center = lambda: ":q"
-
+        ui.input_center = Mock(return_value=":q")
         result = ui.get_path_input()
-
+        ui.input_center.assert_called_once()
         assert isinstance(result, ActionResult)
         assert result.kind == ActionKind.TERMINATE
-
 
     def test_prompt_merged_filename_colon_q_terminates(self):
+        from unittest.mock import Mock
         console = Console(record=True)
         ui = RetroCLI(console=console)
-        ui.input_center = lambda: ":q"
-
+        ui.input_center = Mock(return_value=":q")
         result = ui.prompt_merged_filename()
-
+        ui.input_center.assert_called_once()
         assert isinstance(result, ActionResult)
         assert result.kind == ActionKind.TERMINATE
-
-
-class TestMissingBranches:
-    """Tests for UI branches that were previously exercised by separate files."""
-    pass

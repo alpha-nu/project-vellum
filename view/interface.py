@@ -103,10 +103,6 @@ class UIInterface(ABC):
         pass
 
     @abstractmethod
-    def print_panel(self, content: str, content_color_key: str = "prompt"):
-        pass
-
-    @abstractmethod
     def show_error(self, message: str):
         pass
 

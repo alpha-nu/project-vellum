@@ -7,6 +7,7 @@ from rich.progress import (
     TextColumn,
     BarColumn,
     TimeRemainingColumn,
+    SpinnerColumn
 )
 from rich.live import Live
 from contextlib import contextmanager
@@ -17,6 +18,7 @@ from view.output_format import OutputFormat
 from view.merge_mode import MergeMode
 from view.interface import UIInterface, ActionResult
 from view.keyboard import KeyboardKey
+from sys import stdout
 
 
 class _StyledTimeMixin:
@@ -217,13 +219,23 @@ class RetroCLI(UIInterface):
         term_width = self.console.size.width
         self.console.print(Align.center(renderable, width=term_width))
 
-    def input_center(self, prompt_symbol=">>: "):
-        term_width = self.console.size.width
-        left_padding = (term_width - self.panel_width) // 2 + 1
-        prompt_str = " " * left_padding + prompt_symbol
-        markup = f"[{self.colors['primary']}]" + prompt_str + "[/]"
-        return self.console.input(markup, markup=True)
+    def input_center(self, prompt_symbol=">>", title = "", hint = ""):
+        left_padding = (self.console.size.width - self.panel_width) // 2 + 3
+        markup = f"[{self.colors['subtle']}]{hint}[/]\n\n" + \
+            f"[{self.colors['primary']}]{prompt_symbol}[/]"
+        self.print_center(self._create_panel(markup, title, padding=(1, 0, 1, 1)))
 
+        hints = f"[{self.colors['secondary']}][ENTER][/]:confirm  [{self.colors['secondary']}][:Q][/]:quit"
+        self.print_center(self._create_hint_panel(hints))
+        
+        # Some Magic to hijack and reposition the blinking cursos
+        stdout.write("\033[6A") # More Magic: move up 6 lines. The hight of the hints panel + padding
+        stdout.write(f"\033[{len(prompt_symbol) + left_padding}C") # move left
+        stdout.flush()
+        user_input = input("") 
+        stdout.write("\033[5B") # Move Down 5 (past bottom border), not to override the above
+        stdout.flush()
+        return user_input
 
 
     def clear_and_show_header(self):
@@ -326,14 +338,8 @@ class RetroCLI(UIInterface):
         """Get path input from user."""
         self.console.clear()
         self.draw_header()
-        prompt = (
-            f"[{self.colors['primary']}]provide a file or directory path[/] "
-            f"[{self.colors['secondary']}](e.g. source.pdf or /data)[/]"
-        )
-        self.print_center(self._create_panel(prompt))
-        hints = f"[{self.colors['secondary']}][ENTER][/]:confirm  [{self.colors['secondary']}]:q[/]:quit"
-        self.print_center(self._create_hint_panel(hints))
-        result = self.input_center()
+        
+        result = self.input_center(title="select input source", hint="e.g. source.pdf or /data")
         if result.strip().lower() == ":q":
             return ActionResult.terminate()
         return ActionResult.value(result)
@@ -356,14 +362,8 @@ class RetroCLI(UIInterface):
         """Prompt user for the name of the merged output file."""
         self.console.clear()
         self.draw_header()
-        prompt = (
-            f"[{self.colors['primary']}]enter name for merged output file[/] "
-            f"[{self.colors['secondary']}](without extension)[/]"
-        )
-        self.print_center(self._create_panel(prompt))
-        hints = f"[{self.colors['secondary']}][ENTER][/]:confirm  [{self.colors['secondary']}]:q[/]:quit"
-        self.print_center(self._create_hint_panel(hints))
-        result = self.input_center()
+        
+        result = self.input_center(title="select merged output", hint="output file name without extension")
         if result.strip().lower() == ":q":
             return ActionResult.terminate()
         return ActionResult.value(result.strip())
@@ -372,6 +372,10 @@ class RetroCLI(UIInterface):
         @contextmanager
         def _progress_ctx():
             progress = Progress(
+                SpinnerColumn(
+                    speed=.75,
+                    style=self.colors["accented"]
+                ),
                 StyledDescriptionColumn(self.colors),
                 BarColumn(
                     bar_width=None,
@@ -396,14 +400,6 @@ class RetroCLI(UIInterface):
                 yield progress
 
         return _progress_ctx()
-
-    def print_panel(self, content: str, content_color_key: str = "primary"):
-        panel = Panel(
-            f"[{self.colors[content_color_key]}]{content}[/]",
-            border_style=self.colors["subtle"],
-            width=self.panel_width,
-        )
-        self.print_center(panel)
 
     def show_error(self, message: str):
         markup = f"[{self.colors['error']}]" + message + "[/]"
