@@ -326,9 +326,16 @@ class RetroCLI(UIInterface):
         """Get path input from user."""
         self.console.clear()
         self.draw_header()
-        prompt = f"[{self.colors['primary']}]provide a file or directory path[/] [{self.colors['secondary']}](e.g. source.pdf or /data)[/]"
+        prompt = (
+            f"[{self.colors['primary']}]provide a file or directory path[/] "
+            f"[{self.colors['secondary']}](e.g. source.pdf or /data)[/]"
+        )
         self.print_center(self._create_panel(prompt))
+        hints = f"[{self.colors['secondary']}][ENTER][/]:confirm  [{self.colors['secondary']}]:q[/]:quit"
+        self.print_center(self._create_hint_panel(hints))
         result = self.input_center()
+        if result.strip().lower() == ":q":
+            return ActionResult.terminate()
         return ActionResult.value(result)
 
     def select_output_format(self) -> ActionResult[OutputFormat]:
@@ -349,10 +356,17 @@ class RetroCLI(UIInterface):
         """Prompt user for the name of the merged output file."""
         self.console.clear()
         self.draw_header()
-        prompt = f"[{self.colors['primary']}]enter name for merged output file[/] [{self.colors['secondary']}](without extension)[/]"
+        prompt = (
+            f"[{self.colors['primary']}]enter name for merged output file[/] "
+            f"[{self.colors['secondary']}](without extension)[/]"
+        )
         self.print_center(self._create_panel(prompt))
-        result = self.input_center().strip()
-        return ActionResult.value(result)
+        hints = f"[{self.colors['secondary']}][ENTER][/]:confirm  [{self.colors['secondary']}]:q[/]:quit"
+        self.print_center(self._create_hint_panel(hints))
+        result = self.input_center()
+        if result.strip().lower() == ":q":
+            return ActionResult.terminate()
+        return ActionResult.value(result.strip())
 
     def get_progress_bar(self):
         @contextmanager

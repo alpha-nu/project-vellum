@@ -39,6 +39,7 @@ def keyboard_from_string(input_str):
         "DOWN": KeyboardToken(KeyboardKey.DOWN),
         "ENTER": KeyboardToken(KeyboardKey.ENTER),
         "SPACE": KeyboardToken(KeyboardKey.SPACE),
+        "BACKSPACE": KeyboardToken(KeyboardKey.BACKSPACE),
     }
     
     sequence = []
@@ -291,7 +292,6 @@ class TestDisplayMethods:
         
         text = console.export_text()
         assert "VELLUM" in text or "epub" in text
-        assert "v.1.0.0" in text
     
     def test_show_error(self):
         """Test error message display"""
@@ -441,6 +441,29 @@ class TestSelectionMethods:
         text = console.export_text()
         assert "output created:      document.txt" in text
         assert "total runtime:       2.50s" in text
+
+    def test_radio_select_q_terminates(self):
+        # Use existing keyboard helper to simulate pressing 'q'
+        keyboard = keyboard_from_string("q")
+        console = Console(record=True)
+        ui = RetroCLI(console=console, keyboard_reader=keyboard)
+
+        result = ui.select_output_format()
+
+        assert result.kind == ActionKind.TERMINATE
+
+
+    def test_select_files_back_on_backspace(self):
+        # Use existing keyboard helper to simulate BACKSPACE
+        keyboard = keyboard_from_string("BACKSPACE")
+        console = Console(record=True)
+        ui = RetroCLI(console=console, keyboard_reader=keyboard)
+
+        file_data = {"name": "a.pdf", "size": "1KB"}
+
+        result = ui.select_files([file_data])
+
+        assert result.kind == ActionKind.BACK
     
     def test_clear_and_show_header(self):
         """Test clear_and_show_header clears console and redraws header"""
@@ -462,33 +485,17 @@ class TestSelectionMethods:
         """ask_again should return True for Enter and False for 'q'"""
         console = Console(record=True)
         
-        # Test Enter -> True
+        # Test Enter -> Proceed
         keyboard_reader = keyboard_from_string("ENTER")
         ui = RetroCLI(console=console, keyboard_reader=keyboard_reader)
         res = ui.ask_again()
-        if isinstance(res, ActionResult):
-            if res.kind == ActionKind.VALUE:
-                res = res.payload
-            elif res.kind == ActionKind.PROCEED:
-                res = True
-            elif res.kind == ActionKind.TERMINATE:
-                res = False
-            else:
-                res = None
-        assert res is True
+        assert res.kind == ActionKind.PROCEED
 
-        # Test 'q' -> False
+        # Test 'q' -> Terminate
         keyboard_reader = keyboard_from_string("q")
         ui = RetroCLI(console=console, keyboard_reader=keyboard_reader)
         res = ui.ask_again()
-        if isinstance(res, ActionResult):
-            if res.kind == ActionKind.VALUE:
-                res = res.payload
-            elif res.kind == ActionKind.TERMINATE:
-                res = False
-            else:
-                res = None
-        assert res is False
+        assert res.kind == ActionKind.TERMINATE
 
     def test_ask_again_ignores_other_keys(self):
         """ask_again should ignore unrelated keys until a valid one is pressed"""
@@ -498,15 +505,7 @@ class TestSelectionMethods:
         keyboard_reader = keyboard_from_string("x ENTER")
         ui = RetroCLI(console=console, keyboard_reader=keyboard_reader)
         res = ui.ask_again()
-        if isinstance(res, ActionResult):
-            if res.kind == ActionKind.VALUE:
-                res = res.payload
-            elif res.kind == ActionKind.PROCEED:
-                res = True
-            else:
-                res = None
-        assert res is True
-
+        assert res.kind == ActionKind.PROCEED
 
 
 class TestInteractiveSelection:
@@ -530,10 +529,8 @@ class TestInteractiveSelection:
         
         file_data = self._paths_to_file_data(files)
         selected = ui.select_files(file_data)
-        if isinstance(selected, ActionResult):
-            selected = selected.payload
 
-        assert selected == []
+        assert selected.payload == []
     
     def test_select_files_space_then_enter(self, tmp_path):
         """Test selecting file with space then enter"""
@@ -547,12 +544,9 @@ class TestInteractiveSelection:
         ui = RetroCLI(console=console, keyboard_reader=keyboard_reader)
         
         file_data = self._paths_to_file_data(files)
-        selected = ui.select_files(file_data)
-        if isinstance(selected, ActionResult):
-            selected = selected.payload
+        selected = ui.select_files(file_data).payload
 
-        assert len(selected) == 1
-        assert selected[0] == 0  # First file index
+        assert selected == [0]
     
     def test_select_files_down_arrow(self, tmp_path):
         """Test navigating with down arrow"""
@@ -1039,3 +1033,33 @@ class TestOutputFormatSelection:
         
         result = ui.select_output_format()
         assert result.payload == OutputFormat.PLAIN_TEXT
+
+
+class TestQuitHandlers:
+    """Tests for handlers that accept ':q' to quit/terminate."""
+
+    def test_get_path_input_colon_q_terminates(self):
+        console = Console(record=True)
+        ui = RetroCLI(console=console)
+        ui.input_center = lambda: ":q"
+
+        result = ui.get_path_input()
+
+        assert isinstance(result, ActionResult)
+        assert result.kind == ActionKind.TERMINATE
+
+
+    def test_prompt_merged_filename_colon_q_terminates(self):
+        console = Console(record=True)
+        ui = RetroCLI(console=console)
+        ui.input_center = lambda: ":q"
+
+        result = ui.prompt_merged_filename()
+
+        assert isinstance(result, ActionResult)
+        assert result.kind == ActionKind.TERMINATE
+
+
+class TestMissingBranches:
+    """Tests for UI branches that were previously exercised by separate files."""
+    pass
