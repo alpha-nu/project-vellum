@@ -44,7 +44,7 @@ class ConverterController:
         self.handlers = handlers
         self.path_factory = path_factory
         self.file_factory = file_factory
-        self.state_machine = ConversionWorkflow()
+        self.workflow = ConversionWorkflow()
 
     def run(self, loop: bool = True):
         """Run the workflow.
@@ -68,19 +68,19 @@ class ConverterController:
                 WorkflowState.COMPLETE: self._handle_complete,
             }
 
-            current_state = self.state_machine.get_state()
+            current_state = self.workflow.get_state()
             result = handlers.get(current_state)()
 
-            if result.kind == ActionKind.BACK and self.state_machine.can_go_back():
-                self.state_machine.back()
+            if result.kind == ActionKind.BACK and self.workflow.can_go_back():
+                self.workflow.back()
                 return True
             if result.kind == ActionKind.TERMINATE:
                 return False
             if result.kind == ActionKind.ERROR:
                 # Set error in context and transition to ERROR state
-                self.state_machine.context.error_message = result.message
-                self.state_machine.context.error_origin = current_state
-                self.state_machine.state = WorkflowState.ERROR
+                self.workflow.context.error_message = result.message
+                self.workflow.context.error_origin = current_state
+                self.workflow.state = WorkflowState.ERROR
                 return True
             if result.kind == ActionKind.PROCEED:
                 return True
@@ -104,7 +104,7 @@ class ConverterController:
             List of files to process
         """
         if input_path.is_dir():
-            compatible_files = self.state_machine.context.compatible_files
+            compatible_files = self.workflow.context.compatible_files
             file_data = [self.file_factory(path).to_dict() for path in compatible_files]
             result = self.ui.select_files(file_data)
             if result.kind != ActionKind.VALUE:
@@ -318,9 +318,9 @@ class ConverterController:
                 return ActionResult.error("selected file type is not supported")
             compatible_files = [input_path]
 
-        self.state_machine.context.compatible_files = compatible_files
-        self.state_machine.context.input_path = input_path
-        self.state_machine.next()
+        self.workflow.context.compatible_files = compatible_files
+        self.workflow.context.input_path = input_path
+        self.workflow.next()
         return ActionResult.proceed()
 
     def _handle_format_selection(self):
@@ -329,8 +329,8 @@ class ConverterController:
             return result
         format_choice = result.payload
 
-        self.state_machine.context.format_choice = format_choice
-        self.state_machine.next()
+        self.workflow.context.format_choice = format_choice
+        self.workflow.next()
         return ActionResult.proceed()
 
     def _handle_merge_mode_selection(self):
@@ -339,20 +339,20 @@ class ConverterController:
             return result
         merge_mode = result.payload
 
-        self.state_machine.context.merge_mode = merge_mode
+        self.workflow.context.merge_mode = merge_mode
         if merge_mode == MergeMode.MERGE:
             merged_result = self.ui.prompt_merged_filename()
             if merged_result.kind != ActionKind.VALUE:
                 return merged_result
             merged_filename = merged_result.payload
-            self.state_machine.context.merged_filename = merged_filename
+            self.workflow.context.merged_filename = merged_filename
 
-        self.state_machine.next()
+        self.workflow.next()
         return ActionResult.proceed()
 
     def _handle_files_selection(self):
-        input_path = self.state_machine.context.input_path
-        compatible_files = self.state_machine.context.compatible_files
+        input_path = self.workflow.context.input_path
+        compatible_files = self.workflow.context.compatible_files
 
         if input_path.is_dir():
             file_data = [self.file_factory(path).to_dict() for path in compatible_files]
@@ -365,15 +365,15 @@ class ConverterController:
             files = [input_path]
 
         if not files:
-            self.state_machine.back()
+            self.workflow.back()
             return ActionResult.error("no files selected")
 
-        self.state_machine.context.files = files
-        self.state_machine.next()
+        self.workflow.context.files = files
+        self.workflow.next()
         return ActionResult.proceed()
 
     def _handle_processing(self):
-        context = self.state_machine.context
+        context = self.workflow.context
         context.handler = (handler := self.handlers[context.format_choice]())
 
         total_input_size = sum(file.stat().st_size for file in context.files)
@@ -407,15 +407,15 @@ class ConverterController:
             total_output_size_formatted=File.format_file_size(total_output_size),
             single_output_filename=single_output_filename
         )
-        self.state_machine.next()
+        self.workflow.next()
         return ActionResult.proceed()
 
     def _handle_complete(self) -> bool:
         if self.ui.ask_again().kind == ActionKind.PROCEED:
-            self.state_machine.reset()
+            self.workflow.reset()
             return ActionResult.proceed()
         else:
-            self.state_machine.next()
+            self.workflow.next()
             return ActionResult.terminate()
 
     def _handle_error(self) -> bool:
@@ -424,21 +424,21 @@ class ConverterController:
         Returns:
             True to continue (restart), False to stop the run loop (quit).
         """
-        msg = self.state_machine.context.error_message
+        msg = self.workflow.context.error_message
         self.ui.show_error(msg)
 
         if self.ui.ask_again().kind == ActionKind.PROCEED:
             # On retry, return to the originating state if available.
-            origin = self.state_machine.context.error_origin
+            origin = self.workflow.context.error_origin
             # Clear error fields
-            self.state_machine.context.error_message = None
-            self.state_machine.context.error_origin = None
+            self.workflow.context.error_message = None
+            self.workflow.context.error_origin = None
 
             if origin is not None:
-                self.state_machine.state = origin
+                self.workflow.state = origin
                 return ActionResult.proceed()
             # Fallback: reset workflow
-            self.state_machine.reset()
+            self.workflow.reset()
             return ActionResult.proceed()
         else:
             return ActionResult.terminate()

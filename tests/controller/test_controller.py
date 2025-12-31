@@ -167,7 +167,7 @@ class TestRunOnce:
         result = controller.run(loop=False)  # ERROR -> ask_again -> restore
 
         assert result is True
-        assert controller.state_machine.get_state() == WorkflowState.SOURCE_INPUT
+        assert controller.workflow.get_state() == WorkflowState.SOURCE_INPUT
 
     def test_error_retry_with_no_origin_resets(self, mock_converters, mock_handler):
         """If an ERROR has no origin, retry should reset the workflow."""
@@ -188,7 +188,7 @@ class TestRunOnce:
         result = controller.run(loop=False)  # ERROR -> ask_again -> reset
 
         assert result is True
-        assert controller.state_machine.get_state() == WorkflowState.SOURCE_INPUT
+        assert controller.workflow.get_state() == WorkflowState.SOURCE_INPUT
 
 # --- migrated from tests/controller/test_coverage_extras.py ---
 def make_controller(ui=None):
@@ -200,18 +200,18 @@ def test_run_once_transitions_to_error_state_on_error_result_extra():
     ui = MagicMock()
     ui.get_path_input.return_value = ActionResult.error("boom")
     controller = make_controller(ui)
-    controller.state_machine.state = WorkflowState.SOURCE_INPUT
+    controller.workflow.state = WorkflowState.SOURCE_INPUT
 
     # Running a single step should transition to ERROR
     res = controller.run(loop=False)
-    assert controller.state_machine.state == WorkflowState.ERROR
-    assert controller.state_machine.context.error_message == "boom"
+    assert controller.workflow.state == WorkflowState.ERROR
+    assert controller.workflow.context.error_message == "boom"
 
 def test_handle_complete_terminate_returns_result_extra():
     ui = MagicMock()
     ui.ask_again.return_value = ActionResult.terminate()
     controller = make_controller(ui)
-    controller.state_machine.state = WorkflowState.COMPLETE
+    controller.workflow.state = WorkflowState.COMPLETE
 
     result = controller._handle_complete()
     assert isinstance(result, ActionResult)
@@ -222,8 +222,8 @@ def test_handle_error_terminate_returns_result_extra():
     ui = MagicMock()
     ui.ask_again.return_value = ActionResult.terminate()
     controller = make_controller(ui)
-    controller.state_machine.state = WorkflowState.ERROR
-    controller.state_machine.context.error_message = "boom"
+    controller.workflow.state = WorkflowState.ERROR
+    controller.workflow.context.error_message = "boom"
 
     result = controller._handle_error()
     assert isinstance(result, ActionResult)
@@ -234,8 +234,8 @@ def test_handle_error_value_false_returns_terminate_extra():
     ui = MagicMock()
     ui.ask_again.return_value = ActionResult.value(False)
     controller = make_controller(ui)
-    controller.state_machine.state = WorkflowState.ERROR
-    controller.state_machine.context.error_message = "boom"
+    controller.workflow.state = WorkflowState.ERROR
+    controller.workflow.context.error_message = "boom"
 
     result = controller._handle_error()
     assert isinstance(result, ActionResult)
@@ -246,12 +246,12 @@ def test_run_once_handles_back_with_history_extra():
     ui = MagicMock()
     # move state forward so back is possible
     controller = make_controller(ui)
-    controller.state_machine.next()  # SOURCE_INPUT -> FORMAT_SELECTION
+    controller.workflow.next()  # SOURCE_INPUT -> FORMAT_SELECTION
     # select_output_format will be called in FORMAT_SELECTION
     ui.select_output_format.return_value = ActionResult.back()
 
     # ensure current state is FORMAT_SELECTION
-    controller.state_machine.state = WorkflowState.FORMAT_SELECTION
+    controller.workflow.state = WorkflowState.FORMAT_SELECTION
 
     res = controller.run(loop=False)
     # back should have been handled and run_once returns True to continue
@@ -261,8 +261,8 @@ def test_run_once_handles_back_with_history_extra():
 def test_run_once_handles_terminate_from_handler_extra():
     ui = MagicMock()
     controller = make_controller(ui)
-    controller.state_machine.next()
-    controller.state_machine.state = WorkflowState.FORMAT_SELECTION
+    controller.workflow.next()
+    controller.workflow.state = WorkflowState.FORMAT_SELECTION
     ui.select_output_format.return_value = ActionResult.terminate()
 
     res = controller.run(loop=False)
@@ -272,7 +272,7 @@ def test_handle_complete_value_false_terminates_extra():
     ui = MagicMock()
     ui.ask_again.return_value = ActionResult.value(False)
     controller = make_controller(ui)
-    controller.state_machine.state = WorkflowState.COMPLETE
+    controller.workflow.state = WorkflowState.COMPLETE
 
     result = controller._handle_complete()
     assert isinstance(result, ActionResult)
@@ -297,13 +297,13 @@ class TestRunOnceExtra:
     def test_run_once_back_moves_state_back(self):
         ui = MagicMock()
         controller = ConverterController(ui, {}, {}, lambda s: None)
-        controller.state_machine.next()  # SOURCE_INPUT -> FORMAT_SELECTION
+        controller.workflow.next()  # SOURCE_INPUT -> FORMAT_SELECTION
 
         ui.select_output_format.return_value = ActionResult.back()
 
         res = controller.run(loop=False)
         assert res is True
-        assert controller.state_machine.get_state().name == 'SOURCE_INPUT'
+        assert controller.workflow.get_state().name == 'SOURCE_INPUT'
 
 
     def test_run_once_error_sets_error_state(self):
@@ -313,8 +313,8 @@ class TestRunOnceExtra:
         controller = ConverterController(ui, {}, {}, lambda s: MockPathBuilder().with_exists(False).build())
 
         controller.run(loop=False)
-        assert controller.state_machine.get_state().name == 'ERROR'
-        assert controller.state_machine.context.error_message == 'boom'
+        assert controller.workflow.get_state().name == 'ERROR'
+        assert controller.workflow.context.error_message == 'boom'
 
 
     def test_get_files_to_process_quit_returns_empty_list(self):
@@ -329,7 +329,7 @@ class TestRunOnceExtra:
         ui.select_files.return_value = ActionResult.terminate()
 
         controller = ConverterController(ui, {'.pdf': lambda p: None}, {}, lambda s: mock_dir)
-        controller.state_machine.context.compatible_files = []
+        controller.workflow.context.compatible_files = []
         files = controller._get_files_to_process(mock_dir)
         assert files == []
 
@@ -602,13 +602,13 @@ class TestActionResultHandling:
         controller = ConverterController(ui, mock_converters, {OutputFormat.PLAIN_TEXT: lambda: mock_handler}, lambda s: None)
 
         # Move state machine to FORMAT_SELECTION (push SOURCE_INPUT on stack)
-        controller.state_machine.next()
+        controller.workflow.next()
 
         # Run one step (FORMAT_SELECTION) and expect it to handle BACK and return True
         result = controller.run(loop=False)
 
         assert result is True
-        assert controller.state_machine.get_state() == WorkflowState.SOURCE_INPUT
+        assert controller.workflow.get_state() == WorkflowState.SOURCE_INPUT
 
 
     def test_quit_from_files_selection_stops_run(self, mock_converters, mock_handler):
@@ -619,14 +619,14 @@ class TestActionResultHandling:
         controller = ConverterController(ui, mock_converters, {OutputFormat.PLAIN_TEXT: lambda: mock_handler}, lambda s: None)
 
         # Advance state machine to FILES_SELECTION
-        controller.state_machine.next()
-        controller.state_machine.next()
-        controller.state_machine.next()
+        controller.workflow.next()
+        controller.workflow.next()
+        controller.workflow.next()
 
         # Ensure there is an input_path in context for the handler to inspect
-        controller.state_machine.context.input_path = MockPathBuilder().with_is_dir(True).build()
+        controller.workflow.context.input_path = MockPathBuilder().with_is_dir(True).build()
         # Also provide compatible_files since we're bypassing _handle_source_input
-        controller.state_machine.context.compatible_files = [
+        controller.workflow.context.compatible_files = [
             MockPathBuilder().with_suffix('.pdf').with_stem('x').build()
         ]
 
@@ -645,8 +645,8 @@ class TestActionResultHandling:
         result = controller.run(loop=False)
 
         assert result is True
-        assert controller.state_machine.get_state() == WorkflowState.ERROR
-        assert controller.state_machine.context.error_message == "bad path"
+        assert controller.workflow.get_state() == WorkflowState.ERROR
+        assert controller.workflow.context.error_message == "bad path"
 
 
 class TestSaveMergedOutputExtra:
@@ -700,7 +700,7 @@ class TestControllerAdditionalBranches:
 
         controller = ConverterController(ui, {'.pdf': lambda p: None}, {}, lambda s: mock_dir)
         # runtime would cache compatible files; test should provide them explicitly
-        controller.state_machine.context.compatible_files = [
+        controller.workflow.context.compatible_files = [
             MockPathBuilder().with_suffix('.pdf').with_stem('x').build()
         ]
         files = controller._get_files_to_process(mock_dir)
@@ -715,7 +715,7 @@ class TestControllerAdditionalBranches:
 
         result = controller._handle_merge_mode_selection()
         assert result.kind == ActionKind.PROCEED
-        assert controller.state_machine.context.merged_filename == 'custom_name'
+        assert controller.workflow.context.merged_filename == 'custom_name'
 
     def test_complete_nonvalue_ask_again_quits(self):
         ui = MagicMock()
@@ -723,7 +723,7 @@ class TestControllerAdditionalBranches:
 
         controller = ConverterController(ui, {}, {OutputFormat.PLAIN_TEXT: lambda: MagicMock()}, lambda s: None)
         # move to COMPLETE state
-        controller.state_machine.state = WorkflowState.COMPLETE
+        controller.workflow.state = WorkflowState.COMPLETE
 
         res = controller.run(loop=False)
         assert res is False
@@ -746,7 +746,7 @@ class TestControllerAdditionalBranches:
 
         controller = ConverterController(ui, {'.pdf': lambda p: None, '.epub': lambda p: None}, {}, lambda s: mock_dir)
         # runtime would cache compatible files; test should provide them explicitly
-        controller.state_machine.context.compatible_files = [
+        controller.workflow.context.compatible_files = [
             MockPathBuilder().with_suffix('.pdf').with_stem('a').build(),
             MockPathBuilder().with_suffix('.epub').with_stem('b').build(),
         ]
@@ -779,8 +779,8 @@ class TestControllerAdditionalBranches:
         ui.ask_again.return_value = ActionResult.terminate()
 
         controller = ConverterController(ui, {}, {OutputFormat.PLAIN_TEXT: lambda: MagicMock()}, lambda s: None)
-        controller.state_machine.context.error_message = 'boom'
-        controller.state_machine.state = WorkflowState.ERROR
+        controller.workflow.context.error_message = 'boom'
+        controller.workflow.state = WorkflowState.ERROR
 
         res = controller._handle_error()
         assert res.kind == ActionKind.TERMINATE
@@ -806,15 +806,15 @@ def test_handle_error_with_origin_restores_state():
 
     controller = make_controller(ui)
     # set error context and an origin state
-    controller.state_machine.context.error_message = "boom"
-    controller.state_machine.context.error_origin = WorkflowState.FORMAT_SELECTION
-    controller.state_machine.state = WorkflowState.ERROR
+    controller.workflow.context.error_message = "boom"
+    controller.workflow.context.error_origin = WorkflowState.FORMAT_SELECTION
+    controller.workflow.state = WorkflowState.ERROR
 
     result = controller._handle_error()
     assert isinstance(result, ActionResult)
     assert result.kind == ActionKind.PROCEED
     # state should be restored to origin
-    assert controller.state_machine.get_state() == WorkflowState.FORMAT_SELECTION
+    assert controller.workflow.get_state() == WorkflowState.FORMAT_SELECTION
 
 
 def test_run_once_back_without_history_returns_true_and_keeps_state():
@@ -823,11 +823,11 @@ def test_run_once_back_without_history_returns_true_and_keeps_state():
 
     controller = make_controller(ui)
     # initial state has no back history
-    assert controller.state_machine.can_go_back() is False
+    assert controller.workflow.can_go_back() is False
 
     res = controller.run(loop=False)
     assert res is True
-    assert controller.state_machine.get_state().name == 'SOURCE_INPUT'
+    assert controller.workflow.get_state().name == 'SOURCE_INPUT'
 
 
 def test_handle_error_proceed_with_no_origin_resets_and_returns_proceed():
@@ -835,15 +835,15 @@ def test_handle_error_proceed_with_no_origin_resets_and_returns_proceed():
     ui.ask_again.return_value = ActionResult.proceed()
 
     controller = make_controller(ui)
-    controller.state_machine.context.error_message = 'boom'
-    controller.state_machine.context.error_origin = None
-    controller.state_machine.state = WorkflowState.ERROR
+    controller.workflow.context.error_message = 'boom'
+    controller.workflow.context.error_origin = None
+    controller.workflow.state = WorkflowState.ERROR
 
     result = controller._handle_error()
     assert isinstance(result, ActionResult)
     assert result.kind == ActionKind.PROCEED
     # reset should put state back to SOURCE_INPUT
-    assert controller.state_machine.get_state() == WorkflowState.SOURCE_INPUT
+    assert controller.workflow.get_state() == WorkflowState.SOURCE_INPUT
 
 
 def test_handle_source_input_unsupported_file_returns_error():
@@ -864,19 +864,19 @@ def test_handle_files_selection_value_selects_files():
     controller = ConverterController(ui, {}, {OutputFormat.PLAIN_TEXT: lambda: MagicMock()}, lambda s: None)
 
     # prepare context as if we are in FILES_SELECTION with a directory input
-    controller.state_machine.next()
-    controller.state_machine.next()
-    controller.state_machine.next()
-    controller.state_machine.context.input_path = MockPathBuilder().with_is_dir(True).build()
+    controller.workflow.next()
+    controller.workflow.next()
+    controller.workflow.next()
+    controller.workflow.context.input_path = MockPathBuilder().with_is_dir(True).build()
     p1 = MockPathBuilder().with_suffix('.pdf').with_stem('a').build()
     p2 = MockPathBuilder().with_suffix('.pdf').with_stem('b').build()
-    controller.state_machine.context.compatible_files = [p1, p2]
+    controller.workflow.context.compatible_files = [p1, p2]
 
     ui.select_files.return_value = ActionResult.value([1])
 
     res = controller._handle_files_selection()
     assert res.kind == ActionKind.PROCEED
-    assert controller.state_machine.context.files == [p2]
+    assert controller.workflow.context.files == [p2]
 
 
 def test_handle_files_selection_no_files_selected_returns_error_and_moves_back():
@@ -884,12 +884,12 @@ def test_handle_files_selection_no_files_selected_returns_error_and_moves_back()
     controller = ConverterController(ui, {}, {OutputFormat.PLAIN_TEXT: lambda: MagicMock()}, lambda s: None)
 
     # advance to FILES_SELECTION so back() will pop a previous state
-    controller.state_machine.next()
-    controller.state_machine.next()
-    controller.state_machine.next()
+    controller.workflow.next()
+    controller.workflow.next()
+    controller.workflow.next()
 
-    controller.state_machine.context.input_path = MockPathBuilder().with_is_dir(True).build()
-    controller.state_machine.context.compatible_files = [MockPathBuilder().with_suffix('.pdf').with_stem('x').build()]
+    controller.workflow.context.input_path = MockPathBuilder().with_is_dir(True).build()
+    controller.workflow.context.compatible_files = [MockPathBuilder().with_suffix('.pdf').with_stem('x').build()]
 
     ui.select_files.return_value = ActionResult.value([])
 
