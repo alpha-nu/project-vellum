@@ -1,16 +1,21 @@
 from dataclasses import dataclass, field
-from typing import Any, Optional, List
+from typing import Optional, List, TYPE_CHECKING, Callable
 from enum import Enum, auto
-from typing import Callable, Dict
-from dataclasses import dataclass
+from typing import Dict
+
+from controller.path_protocol import PathLike
+from view.output_format import OutputFormat
+from view.merge_mode import MergeMode
+from domain.core.output_handler import OutputHandler
+from domain.model.file import File
 
 @dataclass
 class WorkflowContext:
-    input_path: Optional[Any] = None
-    format_choice: Optional[Any] = None
-    merge_mode: Optional[Any] = None
-    files: List[Any] = field(default_factory=list)
-    handler: Optional[Any] = None
+    input_path: Optional['PathLike'] = None
+    format_choice: Optional['OutputFormat'] = None
+    merge_mode: Optional['MergeMode'] = None
+    files: List['File'] = field(default_factory=list)
+    handler: Optional['OutputHandler'] = None
     merged_filename: Optional[str] = None
     error_message: Optional[str] = None
     error_origin: Optional['WorkflowState'] = None
@@ -40,20 +45,25 @@ WORKFLOW_TRANSITIONS: Dict[WorkflowState, StateTransition] = {
 }
 
 class ConversionWorkflow:
-    def __init__(self, initial_state: WorkflowState = WorkflowState.SOURCE_INPUT):
+    def __init__(self, initial_state: WorkflowState = WorkflowState.SOURCE_INPUT, on_state_change: Optional[Callable[[], None]] = None):
         self.state = initial_state
         self.state_stack: List[WorkflowState] = []
         self.context = WorkflowContext()
+        self._on_state_change = on_state_change
 
     def next(self) -> None:
         transition = WORKFLOW_TRANSITIONS[self.state]
         if transition.next is not None:
             self.state_stack.append(self.state)
             self.state = transition.next
+            if self._on_state_change:
+                self._on_state_change()
 
     def back(self) -> None:
         if self.state_stack:
             self.state = self.state_stack.pop()
+            if self._on_state_change:
+                self._on_state_change()
 
     def can_go_back(self) -> bool:
         return bool(self.state_stack)
@@ -62,6 +72,8 @@ class ConversionWorkflow:
         self.state = WorkflowState.SOURCE_INPUT
         self.state_stack.clear()
         self.context = WorkflowContext()
+        if self._on_state_change:
+            self._on_state_change()
 
     def get_state(self) -> WorkflowState:
         return self.state

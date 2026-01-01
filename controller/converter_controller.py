@@ -44,7 +44,9 @@ class ConverterController:
         self.handlers = handlers
         self.path_factory = path_factory
         self.file_factory = file_factory
-        self.workflow = ConversionWorkflow()
+        self.workflow = ConversionWorkflow(on_state_change=self._update_breadcrumb_state)
+        
+        self._update_breadcrumb_state()
 
     def run(self, loop: bool = True):
         """Run the workflow.
@@ -296,6 +298,19 @@ class ConverterController:
             if f.suffix.lower() in supported_extensions
         ]
     
+    def _update_breadcrumb_state(self):
+        """Update UI breadcrumb state based on current workflow state and context."""
+        ctx = self.workflow.context
+        current_state = self.workflow.get_state()
+        
+        self.ui.breadcrumb.source_name = ctx.input_path.name if ctx.input_path else None
+        self.ui.breadcrumb.format_name = ctx.format_choice.display_name if ctx.format_choice else None
+        self.ui.breadcrumb.merge_mode_name = ctx.merge_mode.display_name if ctx.merge_mode else None
+        self.ui.breadcrumb.merged_filename = ctx.merged_filename
+        self.ui.breadcrumb.current_state = current_state
+        self.ui.breadcrumb.is_filename_step = current_state == WorkflowState.MERGE_MODE_SELECTION and ctx.merge_mode == MergeMode.MERGE and not ctx.merged_filename
+        self.ui.breadcrumb.show_merge_filename = ctx.merge_mode == MergeMode.MERGE if ctx.merge_mode else False
+
     def _handle_source_input(self):
         result = self.ui.get_path_input()
         if result.kind != ActionKind.VALUE:
@@ -397,6 +412,8 @@ class ConverterController:
         if context.merge_mode == MergeMode.NO_MERGE and len(context.files) == 1:
             single_output_filename = context.files[0].with_suffix(context.format_choice.extension).name
         
+        self.workflow.next()
+        
         self.ui.show_conversion_summary(
             total_files=len(context.files),
             output_count=output_count,
@@ -407,7 +424,6 @@ class ConverterController:
             total_output_size_formatted=File.format_file_size(total_output_size),
             single_output_filename=single_output_filename
         )
-        self.workflow.next()
         return ActionResult.proceed()
 
     def _handle_complete(self) -> bool:

@@ -22,6 +22,7 @@ from view.keyboard import KeyboardToken, KeyboardKey
 
 from domain.model.file import File
 from domain.adapters.file_factories import file_from_path
+from controller.workflow.state_machine import WorkflowState
 
 
 # ===== Keyboard Mock Helper =====
@@ -337,6 +338,14 @@ class TestDisplayMethods:
 
 class TestSelectionMethods:
     """Tests for selection helpers that return ActionResult back when backing out."""
+
+    def test_clear_and_show_header_without_breadcrumb_data(self):
+        from unittest.mock import Mock
+        console = Console()
+        ui = RetroCLI(console=console)
+        ui.draw_breadcrumb = Mock()
+        ui.clear_and_show_header()
+        ui.draw_breadcrumb.assert_called_once()
 
     def test_select_output_format_back_returns_back_action(self):
         keyboard = lambda: KeyboardToken(KeyboardKey.BACKSPACE)
@@ -1035,3 +1044,170 @@ class TestQuitHandlers:
         ui.input_center.assert_called_once()
         assert isinstance(result, ActionResult)
         assert result.kind == ActionKind.TERMINATE
+
+
+class TestBreadcrumb:
+    """Tests for breadcrumb navigation functionality."""
+    
+    def test_draw_breadcrumb_with_source_only(self):
+        console = Console(record=True)
+        ui = RetroCLI(console=console)
+        ui.breadcrumb.source_name = "test.pdf"
+        ui.breadcrumb.format_name = None
+        ui.breadcrumb.merge_mode_name = None
+        ui.breadcrumb.merged_filename = None
+        ui.breadcrumb.current_state = WorkflowState.SOURCE_INPUT
+        ui.breadcrumb.is_filename_step = False
+        ui.breadcrumb.show_merge_filename = False
+        ui.draw_breadcrumb()
+        output = console.export_text()
+        assert "test.pdf" in output
+    
+    def test_draw_breadcrumb_with_source_and_format(self):
+        console = Console(record=True)
+        ui = RetroCLI(console=console)
+        ui.breadcrumb.source_name = "test.pdf"
+        ui.breadcrumb.format_name = "Plain Text"
+        ui.breadcrumb.merge_mode_name = None
+        ui.breadcrumb.merged_filename = None
+        ui.breadcrumb.current_state = WorkflowState.FORMAT_SELECTION
+        ui.breadcrumb.is_filename_step = False
+        ui.breadcrumb.show_merge_filename = False
+        ui.draw_breadcrumb()
+        output = console.export_text()
+        assert "test.pdf" in output
+        assert "Plain Text" in output
+    
+    def test_draw_breadcrumb_full_trail_no_merge(self):
+        console = Console(record=True)
+        ui = RetroCLI(console=console)
+        ui.breadcrumb.source_name = "test.pdf"
+        ui.breadcrumb.format_name = "Markdown"
+        ui.breadcrumb.merge_mode_name = "No Merge"
+        ui.breadcrumb.merged_filename = None
+        ui.breadcrumb.current_state = WorkflowState.MERGE_MODE_SELECTION
+        ui.breadcrumb.is_filename_step = False
+        ui.breadcrumb.show_merge_filename = False
+        ui.draw_breadcrumb()
+        output = console.export_text()
+        assert "test.pdf" in output
+        assert "Markdown" in output
+        assert "No Merge" in output
+        assert output.count(">>") == 2
+    
+    def test_draw_breadcrumb_with_merge_filename(self):
+        console = Console(record=True)
+        ui = RetroCLI(console=console)
+        ui.breadcrumb.source_name = "/data"
+        ui.breadcrumb.format_name = "JSON"
+        ui.breadcrumb.merge_mode_name = "Merge All"
+        ui.breadcrumb.merged_filename = "merged_output"
+        ui.breadcrumb.current_state = WorkflowState.MERGE_MODE_SELECTION
+        ui.breadcrumb.is_filename_step = False
+        ui.breadcrumb.show_merge_filename = True
+        ui.draw_breadcrumb()
+        output = console.export_text()
+        assert "/data" in output
+        assert "JSON" in output
+        assert "Merge All" in output
+        assert "merged_output" in output
+        assert output.count(">>") == 3
+    
+    def test_draw_breadcrumb_current_step_source(self):
+        console = Console(record=True)
+        ui = RetroCLI(console=console)
+        ui.breadcrumb.source_name = "doc.epub"
+        ui.breadcrumb.format_name = "Markdown"
+        ui.breadcrumb.merge_mode_name = "No Merge"
+        ui.breadcrumb.merged_filename = None
+        ui.breadcrumb.current_state = WorkflowState.SOURCE_INPUT
+        ui.breadcrumb.is_filename_step = False
+        ui.breadcrumb.show_merge_filename = False
+        ui.draw_breadcrumb()
+        output = console.export_text()
+        assert "doc.epub" in output
+    
+    def test_draw_breadcrumb_current_step_format(self):
+        console = Console(record=True)
+        ui = RetroCLI(console=console)
+        ui.breadcrumb.source_name = "doc.epub"
+        ui.breadcrumb.format_name = "Plain Text"
+        ui.breadcrumb.merge_mode_name = None
+        ui.breadcrumb.merged_filename = None
+        ui.breadcrumb.current_state = WorkflowState.FORMAT_SELECTION
+        ui.breadcrumb.is_filename_step = False
+        ui.breadcrumb.show_merge_filename = False
+        ui.draw_breadcrumb()
+        output = console.export_text()
+        assert "doc.epub" in output
+        assert "Plain Text" in output
+    
+    def test_draw_breadcrumb_partial_data(self):
+        console = Console(record=True)
+        ui = RetroCLI(console=console)
+        ui.breadcrumb.source_name = "test.pdf"
+        ui.breadcrumb.format_name = "JSON"
+        ui.breadcrumb.merge_mode_name = None
+        ui.breadcrumb.merged_filename = None
+        ui.breadcrumb.current_state = WorkflowState.MERGE_MODE_SELECTION
+        ui.breadcrumb.is_filename_step = False
+        ui.breadcrumb.show_merge_filename = False
+        ui.draw_breadcrumb()
+        output = console.export_text()
+        assert "test.pdf" in output
+        assert "JSON" in output
+    
+    def test_draw_breadcrumb_renders_without_border(self):
+        console = Console(record=True)
+        ui = RetroCLI(console=console)
+        ui.breadcrumb.source_name = "file.pdf"
+        ui.breadcrumb.format_name = None
+        ui.breadcrumb.merge_mode_name = None
+        ui.breadcrumb.merged_filename = None
+        ui.breadcrumb.current_state = WorkflowState.SOURCE_INPUT
+        ui.breadcrumb.is_filename_step = False
+        ui.breadcrumb.show_merge_filename = False
+        ui.draw_breadcrumb()
+        output = console.export_text()
+        assert "file.pdf" in output
+    
+    def test_draw_breadcrumb_pending_source_subtle_color(self):
+        console = Console(record=True)
+        ui = RetroCLI(console=console)
+        ui.breadcrumb.source_name = None
+        ui.breadcrumb.format_name = "Markdown"
+        ui.breadcrumb.merge_mode_name = None
+        ui.breadcrumb.merged_filename = None
+        ui.breadcrumb.current_state = WorkflowState.FORMAT_SELECTION
+        ui.breadcrumb.is_filename_step = False
+        ui.breadcrumb.show_merge_filename = False
+        ui.draw_breadcrumb()
+        output = console.export_text()
+        assert "source" in output
+        assert "Markdown" in output
+    
+    def test_draw_breadcrumb_pending_filename_subtle_color(self):
+        console = Console(record=True)
+        ui = RetroCLI(console=console)
+        ui.breadcrumb.source_name = "test.pdf"
+        ui.breadcrumb.format_name = "JSON"
+        ui.breadcrumb.merge_mode_name = "Merge All"
+        ui.breadcrumb.merged_filename = None
+        ui.breadcrumb.current_state = WorkflowState.MERGE_MODE_SELECTION
+        ui.breadcrumb.is_filename_step = True
+        ui.breadcrumb.show_merge_filename = True
+        ui.draw_breadcrumb()
+        output = console.export_text()
+        assert "test.pdf" in output
+        assert "JSON" in output
+        assert "Merge All" in output
+        assert "output name" in output
+
+    def test_draw_breadcrumb_always_called(self):
+        ui = RetroCLI(console=Console(record=True))
+        
+        with patch.object(ui, "draw_breadcrumb") as mock_draw_breadcrumb:
+            ui.clear_and_show_header()
+            mock_draw_breadcrumb.assert_called_once()
+
+

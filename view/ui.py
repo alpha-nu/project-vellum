@@ -14,12 +14,14 @@ from contextlib import contextmanager
 from rich.table import Table
 from rich.align import Align
 from typing import Optional
+from dataclasses import dataclass
 from view.output_format import OutputFormat
 from view.merge_mode import MergeMode
 from view.interface import UIInterface, ActionResult
 from view.keyboard import KeyboardKey
+from controller.workflow.state_machine import WorkflowState
 from sys import stdout
-from rich.box import HORIZONTALS, HEAVY_HEAD, Box
+from rich.box import HEAVY_HEAD, Box, MINIMAL
 
 HORIZONTALS_NO_BOTTOM = Box(
     " ── \n"
@@ -31,6 +33,17 @@ HORIZONTALS_NO_BOTTOM = Box(
     "    \n"
     "    \n"
 )
+
+@dataclass
+class BreadcrumbState:
+    """Breadcrumb navigation state."""
+    source_name: Optional[str] = None
+    format_name: Optional[str] = None
+    merge_mode_name: Optional[str] = None
+    merged_filename: Optional[str] = None
+    current_state: WorkflowState = WorkflowState.SOURCE_INPUT
+    is_filename_step: bool = False
+    show_merge_filename: bool = False
 
 class _StyledTimeMixin:
     def __init__(self, style: str, attr: str, time_provider=time.perf_counter):
@@ -128,6 +141,9 @@ class RetroCLI(UIInterface):
             "error": "#ff6b81",      # Rosy red for error messages
         }
         self.colors = {**default_colors, **(colors or {})}
+        
+        # Breadcrumb state (updated by controller on state transitions)
+        self.breadcrumb = BreadcrumbState()
 
     @property
     def keyboard_reader(self):
@@ -138,7 +154,7 @@ class RetroCLI(UIInterface):
         """Compute constrained panel width based on terminal and max width."""
         return min(self.max_width, self.console.size.width)
 
-    def _create_panel(self, content, title: Optional[str] = None, padding: Optional[tuple] = None, title_color: Optional[str] = "primary") -> Panel:
+    def _create_panel(self, content, title: Optional[str] = None, padding: Optional[tuple] = None, title_color: Optional[str] = "primary", **style_args) -> Panel:
         """Create a styled panel with consistent settings."""
         kwargs = {
             "border_style": self.colors["subtle"],
@@ -150,7 +166,7 @@ class RetroCLI(UIInterface):
             kwargs["title_align"] = "left"
         if padding:
             kwargs["padding"] = padding
-        return Panel(content, **kwargs)
+        return Panel(content, **(kwargs | style_args))
 
     def _create_hint_panel(self, hints: str) -> Panel:
         """Create a panel for keyboard navigation hints."""
@@ -197,8 +213,7 @@ class RetroCLI(UIInterface):
         hints = f"[{self.colors['secondary']}]⬆︎ /⬇︎[/] :navigate  [{self.colors['secondary']}][ENTER][/]:confirm  [{self.colors['secondary']}][BACKSPACE][/]:back  [{self.colors['secondary']}][Q][/]:quit"
         
         while True:
-            self.console.clear()
-            self.draw_header()
+            self.clear_and_show_header()
             table = self._create_selection_table()
             for i, option in enumerate(options):
                 table.add_row(self._render_radio_row(
@@ -252,9 +267,41 @@ class RetroCLI(UIInterface):
 
 
     def clear_and_show_header(self):
-        """Clear screen and display header - used after file selection to show clean progress view"""
+        """Clear screen and display header with breadcrumb navigation."""
         self.console.clear()
         self.draw_header()
+        self.draw_breadcrumb()
+
+    def draw_breadcrumb(self) -> None:
+        """Draw workflow breadcrumb path below header using current UI state."""
+        segments = []
+        
+        for property, is_active, display_name in (
+            (self.breadcrumb.source_name, self.breadcrumb.current_state == WorkflowState.SOURCE_INPUT, "source"),
+            (self.breadcrumb.format_name, self.breadcrumb.current_state == WorkflowState.FORMAT_SELECTION, "format"),
+            (self.breadcrumb.merge_mode_name, self.breadcrumb.current_state == WorkflowState.MERGE_MODE_SELECTION, "merge mode"),
+            
+        ):
+            if property:
+                segments.append(f"[{self.colors["primary"]}]{property}[/]")
+            else:
+                color = self.colors["secondary"] if is_active else self.colors["subtle"]
+                segments.append((f"[{color}]{display_name}[/]"))
+        
+        if self.breadcrumb.show_merge_filename:
+            if self.breadcrumb.merged_filename:
+                segments.append(f"[{self.colors["primary"]}]{self.breadcrumb.merged_filename}[/]")
+            else:
+                color = self.colors["secondary"] if self.breadcrumb.is_filename_step else self.colors["subtle"]
+                segments.append(f"[{color}]output name[/]")
+        
+        breadcrumb_text = Text()
+        for i, label in enumerate(segments):
+            if i > 0:
+                breadcrumb_text.append(" >> ", style=self.colors["subtle"])
+            breadcrumb_text.append(Text.from_markup(label))
+        
+        self.print_center(self._create_panel(breadcrumb_text, padding=(0, 0, 0, 0), box=MINIMAL))
 
     def draw_header(self):
         ascii_logo = """
@@ -298,8 +345,7 @@ class RetroCLI(UIInterface):
         hints = f"[{self.colors['secondary']}]⬆︎ /⬇︎[/] :navigate  [{self.colors['secondary']}][SPACE][/]:select  [{self.colors['secondary']}][A][/]:all  [{self.colors['secondary']}][ENTER][/]:confirm  [{self.colors['secondary']}][BACKSPACE][/]:back  [{self.colors['secondary']}][Q][/]:quit"
         
         while True:
-            self.console.clear()
-            self.draw_header()
+            self.clear_and_show_header()
             table = self._create_selection_table()
             
             for i, file_info in enumerate(file_data):
@@ -342,15 +388,13 @@ class RetroCLI(UIInterface):
             elif token.key == KeyboardKey.CHAR and token.char == "q":
                 return ActionResult.terminate()
 
-        self.console.clear()
-        self.draw_header()
+        self.clear_and_show_header()
 
         return ActionResult.value(selected_indices)
 
     def get_path_input(self) -> ActionResult[str]:
         """Get path input from user."""
-        self.console.clear()
-        self.draw_header()
+        self.clear_and_show_header()
         
         result = self.input_center(title="select input source", hint="e.g. source.pdf or /data")
         if result.strip().lower() == ":q":
@@ -373,8 +417,7 @@ class RetroCLI(UIInterface):
 
     def prompt_merged_filename(self) -> ActionResult[str]:
         """Prompt user for the name of the merged output file."""
-        self.console.clear()
-        self.draw_header()
+        self.clear_and_show_header()
         
         result = self.input_center(title="select merged output", hint="output file name without extension")
         if result.strip().lower() == ":q":
