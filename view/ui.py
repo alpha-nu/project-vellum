@@ -19,8 +19,18 @@ from view.merge_mode import MergeMode
 from view.interface import UIInterface, ActionResult
 from view.keyboard import KeyboardKey
 from sys import stdout
-from rich.box import HORIZONTALS, HEAVY_HEAD
+from rich.box import HORIZONTALS, HEAVY_HEAD, Box
 
+HORIZONTALS_NO_BOTTOM = Box(
+    " ── \n"
+    "    \n"
+    " ── \n"
+    "    \n"
+    " ── \n"
+    " ── \n"
+    "    \n"
+    "    \n"
+)
 
 class _StyledTimeMixin:
     def __init__(self, style: str, attr: str, time_provider=time.perf_counter):
@@ -102,6 +112,8 @@ class StyledDescriptionColumn(TextColumn):
             return Text.from_markup(f"[{self.colors['subtle']}]{filename}[/]")
 
 class RetroCLI(UIInterface):
+    VERSION = "1.0.0"
+    
     def __init__(self, console: Optional[Console] = None, max_width: int = 120, colors: Optional[dict] = None, keyboard_reader=None):
         self._keyboard_reader = keyboard_reader
         self.max_width = max_width
@@ -131,7 +143,7 @@ class RetroCLI(UIInterface):
         kwargs = {
             "border_style": self.colors["subtle"],
             "width": self.panel_width,
-            "box": HORIZONTALS,
+            "box": HORIZONTALS_NO_BOTTOM,
         }
         if title:
             kwargs["title"] = f"[{self.colors[title_color]}]\\[{title}][/ ]"
@@ -253,7 +265,7 @@ class RetroCLI(UIInterface):
      ╚████╔╝ ███████╗███████╗███████╗╚██████╔╝██║ ╚═╝ ██║
       ╚═══╝  ╚══════╝╚══════╝╚══════╝ ╚═════╝ ╚═╝     ╚═╝
         """
-        subtitle = f"[ epub | pdf -> txt: converter ]"
+        subtitle = f"[ epub | pdf -> txt ]"
         logo_width = max(len(line) for line in ascii_logo.splitlines())
         subtitle_width = len(subtitle) - 1
         padding = (logo_width - subtitle_width) // 2
@@ -262,11 +274,13 @@ class RetroCLI(UIInterface):
             Panel(
                 Align.center(
                     Text(ascii_logo, style=self.colors["logo"]) + 
-                    Text("\n" + " ".ljust(padding) + subtitle.lower(), style=f"{self.colors['secondary']}")
+                    Text("\n" + " ".ljust(padding) + subtitle.lower(), style=f"{self.colors['accented']}")
                 ),
                 border_style=f"dim {self.colors["subtle"]}",
                 width=self.panel_width,
                 box=HEAVY_HEAD,
+                subtitle=f"[not dim {self.colors['subtle']}]{self.VERSION}[/]",
+                subtitle_align="right",
             )
         )
 
