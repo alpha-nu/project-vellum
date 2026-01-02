@@ -6,4 +6,3 @@ pillow
 rich
 pytest
 pytest-cov
-readchar
