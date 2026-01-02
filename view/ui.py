@@ -425,6 +425,7 @@ class RetroCLI(UIInterface):
         return ActionResult.value(result.strip())
 
     def get_progress_bar(self):
+        self.clear_and_show_header()
         @contextmanager
         def _progress_ctx():
             progress = Progress(
