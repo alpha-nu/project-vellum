@@ -44,11 +44,10 @@ class MockUIBuilder:
         
         class TestUI:
             def __init__(self):
-                from view.ui import BreadcrumbState
                 self.update_count = 0
                 self.show_error = MagicMock()
                 self.show_conversion_summary = MagicMock()
-                self.breadcrumb = BreadcrumbState()
+                self.breadcrumb = []
                 # ask_again returns True on first call (if configured), False thereafter
                 from view.interface import ActionResult
                 if builder.run_again:

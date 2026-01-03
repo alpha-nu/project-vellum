@@ -34,16 +34,8 @@ HORIZONTALS_NO_BOTTOM = Box(
     "    \n"
 )
 
-@dataclass
-class BreadcrumbState:
-    """Breadcrumb navigation state."""
-    source_name: Optional[str] = None
-    format_name: Optional[str] = None
-    merge_mode_name: Optional[str] = None
-    merged_filename: Optional[str] = None
-    current_state: WorkflowState = WorkflowState.SOURCE_INPUT
-    is_filename_step: bool = False
-    show_merge_filename: bool = False
+# Breadcrumb is now a simple list of strings representing the path from the
+# workflow state stack. Legacy `BreadcrumbState` dataclass was removed.
 
 class _StyledTimeMixin:
     def __init__(self, style: str, attr: str, time_provider=time.perf_counter):
@@ -143,7 +135,7 @@ class RetroCLI(UIInterface):
         self.colors = {**default_colors, **(colors or {})}
         
         # Breadcrumb state (updated by controller on state transitions)
-        self.breadcrumb = BreadcrumbState()
+        self.breadcrumb = []
 
     @property
     def keyboard_reader(self):
@@ -253,7 +245,7 @@ class RetroCLI(UIInterface):
             )
         self.print_center(self._create_panel(Text.from_markup(markup), title, padding=(1, 0, 0, 1)))
 
-        hints = f"[{self.colors['secondary']}][ENTER][/]:confirm  [{self.colors['secondary']}][:Q][/]:quit"
+        hints = f"[{self.colors['secondary']}][ENTER][/]:confirm  [{self.colors['secondary']}][\Q][/]:quit"
         self.print_center(self._create_hint_panel(hints))
         
         # Some Magic to hijack and reposition the blinking cursos
@@ -273,34 +265,14 @@ class RetroCLI(UIInterface):
         self.draw_breadcrumb()
 
     def draw_breadcrumb(self) -> None:
-        """Draw workflow breadcrumb path below header using current UI state."""
-        segments = []
-        
-        for property, is_active, display_name in (
-            (self.breadcrumb.source_name, self.breadcrumb.current_state == WorkflowState.SOURCE_INPUT, "source"),
-            (self.breadcrumb.format_name, self.breadcrumb.current_state == WorkflowState.FORMAT_SELECTION, "format"),
-            (self.breadcrumb.merge_mode_name, self.breadcrumb.current_state == WorkflowState.MERGE_MODE_SELECTION, "merge mode"),
-            
-        ):
-            if property:
-                segments.append(f"[{self.colors["primary"]}]{property}[/]")
-            else:
-                color = self.colors["secondary"] if is_active else self.colors["subtle"]
-                segments.append((f"[{color}]{display_name}[/]"))
-        
-        if self.breadcrumb.show_merge_filename:
-            if self.breadcrumb.merged_filename:
-                segments.append(f"[{self.colors["primary"]}]{self.breadcrumb.merged_filename}[/]")
-            else:
-                color = self.colors["secondary"] if self.breadcrumb.is_filename_step else self.colors["subtle"]
-                segments.append(f"[{color}]output name[/]")
-        
         breadcrumb_text = Text()
-        for i, label in enumerate(segments):
+        last_index = len(self.breadcrumb) - 1
+        for i, label in enumerate(self.breadcrumb):
             if i > 0:
                 breadcrumb_text.append(" >> ", style=self.colors["subtle"])
-            breadcrumb_text.append(Text.from_markup(label))
-        
+            color = self.colors["secondary"] if i == last_index else self.colors["primary"]
+            breadcrumb_text.append(Text.from_markup(f"[{color}]{label}[/]"))
+
         self.print_center(self._create_panel(breadcrumb_text, padding=(0, 0, 0, 0), box=MINIMAL))
 
     def draw_header(self):
@@ -397,7 +369,7 @@ class RetroCLI(UIInterface):
         self.clear_and_show_header()
         
         result = self.input_center(title="select input source", hint="e.g. source.pdf or /data")
-        if result.strip().lower() == ":q":
+        if result.strip().lower() == "\\q":
             return ActionResult.terminate()
         return ActionResult.value(result)
 
@@ -420,7 +392,7 @@ class RetroCLI(UIInterface):
         self.clear_and_show_header()
         
         result = self.input_center(title="select merged output", hint="output file name without extension")
-        if result.strip().lower() == ":q":
+        if result.strip().lower() == "\\q":
             return ActionResult.terminate()
         return ActionResult.value(result.strip())
 

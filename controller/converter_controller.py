@@ -299,18 +299,51 @@ class ConverterController:
         ]
     
     def _update_breadcrumb_state(self):
-        """Update UI breadcrumb state based on current workflow state and context."""
-        ctx = self.workflow.context
-        current_state = self.workflow.get_state()
-        
-        self.ui.breadcrumb.source_name = ctx.input_path.name if ctx.input_path else None
-        self.ui.breadcrumb.format_name = ctx.format_choice.display_name if ctx.format_choice else None
-        self.ui.breadcrumb.merge_mode_name = ctx.merge_mode.display_name if ctx.merge_mode else None
-        self.ui.breadcrumb.merged_filename = ctx.merged_filename
-        self.ui.breadcrumb.current_state = current_state
-        self.ui.breadcrumb.is_filename_step = current_state == WorkflowState.MERGE_MODE_SELECTION and ctx.merge_mode == MergeMode.MERGE and not ctx.merged_filename
-        self.ui.breadcrumb.show_merge_filename = ctx.merge_mode == MergeMode.MERGE if ctx.merge_mode else False
+        """Update UI breadcrumb state based on current workflow state and context.
 
+        Build a list of simple, UI-friendly labels (strings) that describe the
+        path taken through the workflow. The breadcrumb is derived from the
+        workflow state stack (history) plus the current state, and uses values
+        from the workflow context when available (e.g. input filename,
+        selected format, merge display name) to create meaningful labels.
+
+        Returns:
+            List[str]: breadcrumb labels suitable for rendering by the UI.
+        """
+        ctx = self.workflow.context
+        # Only update breadcrumb for the initial workflow steps
+        # (source -> format -> merge mode -> files). Avoid updating for
+        # processing/complete/error states where a breadcrumb is not useful.
+        current = self.workflow.get_state()
+        if current not in (
+            WorkflowState.SOURCE_INPUT,
+            WorkflowState.FORMAT_SELECTION,
+            WorkflowState.MERGE_MODE_SELECTION,
+            WorkflowState.FILES_SELECTION,
+            WorkflowState.PROCESSING,
+        ):
+            return
+
+        def label_for_state(state: WorkflowState) -> str:
+            if state == WorkflowState.SOURCE_INPUT:
+                return str(ctx.input_path) if ctx.input_path else state.display_name
+
+            if state == WorkflowState.FORMAT_SELECTION:
+                return ctx.format_choice.value if ctx.format_choice else state.display_name
+
+            if state == WorkflowState.MERGE_MODE_SELECTION:
+                if ctx.merged_filename:
+                    return f"merged to: {ctx.merged_filename}"
+                return ctx.merge_mode.display_name if ctx.merge_mode else state.display_name
+
+            if state == WorkflowState.PROCESSING:
+                return f"({(l := len(ctx.files))}) file{"s" if l > 1 else ""}"
+
+            return state.display_name
+
+        segments = self.workflow.get_history() + [self.workflow.get_state()]
+        self.ui.breadcrumb =  [label_for_state(s) for s in segments if s != WorkflowState.FILES_SELECTION]
+    
     def _handle_source_input(self):
         result = self.ui.get_path_input()
         if result.kind != ActionKind.VALUE:
@@ -413,6 +446,7 @@ class ConverterController:
             single_output_filename = context.files[0].with_suffix(context.format_choice.extension).name
         
         self.workflow.next()
+        self._update_breadcrumb_state()
         
         self.ui.show_conversion_summary(
             total_files=len(context.files),

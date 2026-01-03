@@ -29,6 +29,18 @@ class WorkflowState(Enum):
     COMPLETE = auto()
     ERROR = auto()
 
+    @property
+    def display_name(self) -> str:
+        return {
+            WorkflowState.SOURCE_INPUT: "source",
+            WorkflowState.FORMAT_SELECTION: "format",
+            WorkflowState.MERGE_MODE_SELECTION: "merge mode",
+            WorkflowState.FILES_SELECTION: "files",
+            WorkflowState.PROCESSING: "processing",
+            WorkflowState.COMPLETE: "complete",
+            WorkflowState.ERROR: "error",
+        }[self]
+
 @dataclass(frozen=True)
 class StateTransition:
     next: Optional['WorkflowState']
@@ -77,3 +89,6 @@ class ConversionWorkflow:
 
     def get_state(self) -> WorkflowState:
         return self.state
+
+    def get_history(self) -> List[WorkflowState]:
+        return self.state_stack
